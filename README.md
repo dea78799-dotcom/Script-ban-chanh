@@ -29,16 +29,13 @@ local _G_AutoClickLemonDash = false
 local _G_AutoBuild = false
 
 -- ============================
--- HÀM LẤY TẤT CẢ TYCOON TRONG TOÀN BỘ WORKSPACE (BAO GỒM DESCENDANTS)
+-- HÀM LẤY TẤT CẢ TYCOON TRONG WORKSPACE (BAO GỒM TRONG MAP)
 -- ============================
 local function getAllTycoons()
     local tycoons = {}
     for _, obj in pairs(Workspace:GetDescendants()) do
-        if obj:IsA("Model") and obj.Name:find("Tycoon") then
-            -- Chỉ lấy những Tycoon có cấu trúc Purchases (xác định là Tycoon thật)
-            if obj:FindFirstChild("Purchases") then
-                table.insert(tycoons, obj)
-            end
+        if obj:IsA("Model") and obj.Name:find("Tycoon") and obj:FindFirstChild("Purchases") then
+            table.insert(tycoons, obj)
         end
     end
     return tycoons
@@ -240,7 +237,7 @@ local function ClickLemonDashOnce()
 end
 
 -- ============================
--- HÀM TỰ ĐỘNG XÂY DỰNG NHÀ (Purchase) – BAO GỒM TẤT CẢ CÁC NÚT MUA
+-- HÀM TỰ ĐỘNG XÂY DỰNG NHÀ (Purchase)
 -- ============================
 local function BuildHouseOnce()
     local tycoons = getAllTycoons()
@@ -258,7 +255,6 @@ local function BuildHouseOnce()
             totalCalled = totalCalled + 1
         end
     end
-    -- Thông báo debug mỗi 5 giây nếu cần
     if totalCalled == 0 then
         Rayfield:Notify({Title = "⚠️", Content = "Không tìm thấy Remote Purchase nào. Có thể bạn chưa sở hữu công trình.", Duration = 2})
     end
@@ -325,7 +321,7 @@ FarmTab:CreateToggle({
             task.spawn(function()
                 while _G_AutoBuild do
                     BuildHouseOnce()
-                    task.wait(0.5) -- giãn cách 0.5 giây giữa các lần quét, tránh quá tải
+                    task.wait(0.5)
                 end
                 Rayfield:Notify({Title = "⏹️", Content = "Đã dừng tự động xây dựng nhà!", Duration = 3})
             end)
