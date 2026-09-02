@@ -25,19 +25,36 @@ local _G_AutoUpgrade = false
 local _G_AutoHarvest = false
 local _G_AutoRedeem = false
 local _G_AutoClickLemonStand = false
+local _G_AutoClickLemonDash = false
 local _G_AutoBuild = false
 
 -- ============================
--- HÀM LẤY TẤT CẢ TYCOON TRONG WORKSPACE (Tycoon1-10)
+-- HÀM LẤY TẤT CẢ TYCOON TRONG TOÀN BỘ WORKSPACE (BAO GỒM DESCENDANTS)
 -- ============================
 local function getAllTycoons()
     local tycoons = {}
-    for _, obj in pairs(Workspace:GetChildren()) do
+    for _, obj in pairs(Workspace:GetDescendants()) do
         if obj:IsA("Model") and obj.Name:find("Tycoon") then
-            table.insert(tycoons, obj)
+            -- Chỉ lấy những Tycoon có cấu trúc Purchases (xác định là Tycoon thật)
+            if obj:FindFirstChild("Purchases") then
+                table.insert(tycoons, obj)
+            end
         end
     end
     return tycoons
+end
+
+-- ============================
+-- HÀM TÌM TẤT CẢ REMOTE FUNCTION/EVENT THEO TÊN TRONG MỘT MODEL
+-- ============================
+local function findAllRemotes(model, remoteName)
+    local found = {}
+    for _, v in pairs(model:GetDescendants()) do
+        if (v:IsA("RemoteFunction") or v:IsA("RemoteEvent")) and v.Name == remoteName then
+            table.insert(found, v)
+        end
+    end
+    return found
 end
 
 -- ============================
@@ -198,42 +215,52 @@ end
 local function ClickLemonStandOnce()
     local tycoons = getAllTycoons()
     for _, tycoon in ipairs(tycoons) do
-        local remotes = tycoon:FindFirstChild("Remotes")
-        if remotes then
-            local wakeRemote = remotes:FindFirstChild("WakeIncomeStream")
-            if wakeRemote and wakeRemote:IsA("RemoteFunction") then
-                pcall(function()
-                    wakeRemote:InvokeServer("LemonStand")
-                end)
-            end
+        local wakeRemotes = findAllRemotes(tycoon, "WakeIncomeStream")
+        for _, remote in ipairs(wakeRemotes) do
+            pcall(function()
+                remote:InvokeServer("LemonStand")
+            end)
         end
     end
 end
 
 -- ============================
--- HÀM TỰ ĐỘNG XÂY DỰNG NHÀ (Purchase)
+-- HÀM AUTO CLICK LEMONDASH (WakeIncomeStream)
+-- ============================
+local function ClickLemonDashOnce()
+    local tycoons = getAllTycoons()
+    for _, tycoon in ipairs(tycoons) do
+        local wakeRemotes = findAllRemotes(tycoon, "WakeIncomeStream")
+        for _, remote in ipairs(wakeRemotes) do
+            pcall(function()
+                remote:InvokeServer("LemonDash")
+            end)
+        end
+    end
+end
+
+-- ============================
+-- HÀM TỰ ĐỘNG XÂY DỰNG NHÀ (Purchase) – BAO GỒM TẤT CẢ CÁC NÚT MUA
 -- ============================
 local function BuildHouseOnce()
     local tycoons = getAllTycoons()
+    local totalCalled = 0
     for _, tycoon in ipairs(tycoons) do
-        local purchases = tycoon:FindFirstChild("Purchases")
-        if purchases then
-            local lemonStandFolder = purchases:FindFirstChild("Lemon Stand")
-            if lemonStandFolder then
-                local buttons = lemonStandFolder:FindFirstChild("Buttons")
-                if buttons then
-                    local lemonStandButton = buttons:FindFirstChild("Lemon Stand")
-                    if lemonStandButton then
-                        local purchaseRemote = lemonStandButton:FindFirstChild("Purchase")
-                        if purchaseRemote and purchaseRemote:IsA("RemoteFunction") then
-                            pcall(function()
-                                purchaseRemote:InvokeServer(false, false)
-                            end)
-                        end
-                    end
+        local purchaseRemotes = findAllRemotes(tycoon, "Purchase")
+        for _, remote in ipairs(purchaseRemotes) do
+            pcall(function()
+                if remote:IsA("RemoteFunction") then
+                    remote:InvokeServer(false, false)
+                elseif remote:IsA("RemoteEvent") then
+                    remote:FireServer(false, false)
                 end
-            end
+            end)
+            totalCalled = totalCalled + 1
         end
+    end
+    -- Thông báo debug mỗi 5 giây nếu cần
+    if totalCalled == 0 then
+        Rayfield:Notify({Title = "⚠️", Content = "Không tìm thấy Remote Purchase nào. Có thể bạn chưa sở hữu công trình.", Duration = 2})
     end
 end
 
@@ -298,7 +325,7 @@ FarmTab:CreateToggle({
             task.spawn(function()
                 while _G_AutoBuild do
                     BuildHouseOnce()
-                    task.wait(0.1) -- mỗi 0.1 giây
+                    task.wait(0.5) -- giãn cách 0.5 giây giữa các lần quét, tránh quá tải
                 end
                 Rayfield:Notify({Title = "⏹️", Content = "Đã dừng tự động xây dựng nhà!", Duration = 3})
             end)
@@ -392,6 +419,32 @@ ClickTab:CreateToggle({
             end)
         else
             Rayfield:Notify({Title = "⏹️", Content = "Đã tắt Auto Click LemonStand!", Duration = 3})
+        end
+    end
+})
+
+ClickTab:CreateParagraph({
+    Title = "🖱️ Auto Click LemonDash",
+    Content = "Bật để tự động gửi WakeIncomeStream với 'LemonDash' mỗi 0.1 giây trên tất cả Tycoon."
+})
+
+ClickTab:CreateToggle({
+    Name = "Auto Click LemonDash",
+    CurrentValue = false,
+    Flag = "ToggleClickLemonDash",
+    Callback = function(Value)
+        _G_AutoClickLemonDash = Value
+        if _G_AutoClickLemonDash then
+            Rayfield:Notify({Title = "✅", Content = "Đã bật Auto Click LemonDash!", Duration = 3})
+            task.spawn(function()
+                while _G_AutoClickLemonDash do
+                    ClickLemonDashOnce()
+                    task.wait(0.1)
+                end
+                Rayfield:Notify({Title = "⏹️", Content = "Đã dừng Auto Click LemonDash!", Duration = 3})
+            end)
+        else
+            Rayfield:Notify({Title = "⏹️", Content = "Đã tắt Auto Click LemonDash!", Duration = 3})
         end
     end
 })
