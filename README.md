@@ -3,7 +3,7 @@ local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 -- [[ CỬA SỔ CHÍNH ]]
 local Window = Rayfield:CreateWindow({
-   Name = "🍋 Lemon Tycoon Hub",
+   Name = "🍋 MENU BÁN CHANH V2.550",
    Icon = 0,
    LoadingTitle = "Đang tải...",
    LoadingSubtitle = "by Assistant",
@@ -23,9 +23,25 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 -- STATE
 local _G_AutoUpgrade = false
 local _G_AutoHarvest = false
+local _G_AutoRedeem = false
+local _G_AutoClickLemonStand = false
+local _G_AutoBuild = false
 
 -- ============================
--- HÀM TÌM TẤT CẢ REMOTE UPGRADE LIÊN QUAN MỘT LẦN
+-- HÀM LẤY TẤT CẢ TYCOON TRONG WORKSPACE (Tycoon1-10)
+-- ============================
+local function getAllTycoons()
+    local tycoons = {}
+    for _, obj in pairs(Workspace:GetChildren()) do
+        if obj:IsA("Model") and obj.Name:find("Tycoon") then
+            table.insert(tycoons, obj)
+        end
+    end
+    return tycoons
+end
+
+-- ============================
+-- HÀM TÌM REMOTE NÂNG CẤP TOÀN GAME
 -- ============================
 local upgradeKeywords = {"LemonDash", "Lemon Stand", "Lemon Depot", "Lemon Trading"}
 
@@ -45,8 +61,15 @@ local function scanUpgradeRemotes()
     return remotes
 end
 
+local function safeInvokeUpgrade(remote)
+    if not remote then return end
+    pcall(function()
+        remote:InvokeServer(1)
+    end)
+end
+
 -- ============================
--- HÀM DỊCH CHUYỂN TỨC THÌ (KHÔNG TWEEN)
+-- HÀM DỊCH CHUYỂN TỨC THÌ
 -- ============================
 local function instantTeleport(pos)
     if not RootPart then return end
@@ -54,7 +77,7 @@ local function instantTeleport(pos)
 end
 
 -- ============================
--- HÀM TÌM QUẢ "Fruit" CHỈ TRONG CÁC "LemonTree"
+-- HÀM TÌM QUẢ "Fruit" CHỈ TRONG LemonTree
 -- ============================
 local function FindFruitsInLemonTrees()
     local fruits = {}
@@ -84,7 +107,7 @@ local function FindClickDetector(fruit)
 end
 
 -- ============================
--- HÀM CLICK QUẢ (DÙNG fireclickdetector CỦA DELTA)
+-- HÀM CLICK QUẢ
 -- ============================
 local function ClickFruit(fruit)
     local clickDetector = FindClickDetector(fruit)
@@ -124,7 +147,7 @@ local function ClickFruit(fruit)
 end
 
 -- ============================
--- HÀM HÁI QUẢ MỘT VÒNG (TỐI ƯU TỐC ĐỘ)
+-- HÀM HÁI QUẢ MỘT VÒNG
 -- ============================
 local function HarvestOnce()
     local fruits = FindFruitsInLemonTrees()
@@ -151,13 +174,77 @@ local function HarvestOnce()
 end
 
 -- ============================
+-- HÀM NHẶT BAO TIỀN (DropService.Redeem)
+-- ============================
+local function CollectMoneyOnce()
+    pcall(function()
+        local core = ReplicatedStorage:FindFirstChild("Core")
+        if core then
+            local remoteRequest = core:FindFirstChild("RemoteRequest")
+            if remoteRequest then
+                local redeemRemote = remoteRequest:FindFirstChild("DropService.Redeem")
+                if redeemRemote and redeemRemote:IsA("RemoteFunction") then
+                    local randomNumber = math.random(1, 1500)
+                    redeemRemote:InvokeServer(tostring(randomNumber))
+                end
+            end
+        end
+    end)
+end
+
+-- ============================
+-- HÀM AUTO CLICK LEMONSTAND (WakeIncomeStream)
+-- ============================
+local function ClickLemonStandOnce()
+    local tycoons = getAllTycoons()
+    for _, tycoon in ipairs(tycoons) do
+        local remotes = tycoon:FindFirstChild("Remotes")
+        if remotes then
+            local wakeRemote = remotes:FindFirstChild("WakeIncomeStream")
+            if wakeRemote and wakeRemote:IsA("RemoteFunction") then
+                pcall(function()
+                    wakeRemote:InvokeServer("LemonStand")
+                end)
+            end
+        end
+    end
+end
+
+-- ============================
+-- HÀM TỰ ĐỘNG XÂY DỰNG NHÀ (Purchase)
+-- ============================
+local function BuildHouseOnce()
+    local tycoons = getAllTycoons()
+    for _, tycoon in ipairs(tycoons) do
+        local purchases = tycoon:FindFirstChild("Purchases")
+        if purchases then
+            local lemonStandFolder = purchases:FindFirstChild("Lemon Stand")
+            if lemonStandFolder then
+                local buttons = lemonStandFolder:FindFirstChild("Buttons")
+                if buttons then
+                    local lemonStandButton = buttons:FindFirstChild("Lemon Stand")
+                    if lemonStandButton then
+                        local purchaseRemote = lemonStandButton:FindFirstChild("Purchase")
+                        if purchaseRemote and purchaseRemote:IsA("RemoteFunction") then
+                            pcall(function()
+                                purchaseRemote:InvokeServer(false, false)
+                            end)
+                        end
+                    end
+                end
+            end
+        end
+    end
+end
+
+-- ============================
 -- TAB FARM
 -- ============================
 local FarmTab = Window:CreateTab("Farm", 4483362458)
 
 FarmTab:CreateParagraph({
     Title = "⚙️ Tự động nâng cấp",
-    Content = "Bật để tự động nâng cấp LemonDash, Lemon Stand, Lemon Depot và Lemon Trading (quét nhanh một lần, nâng cấp liên tục tốc độ cao)."
+    Content = "Bật để tự động nâng cấp LemonDash, Lemon Stand, Lemon Depot và Lemon Trading (quét RemoteFunction toàn bộ game)."
 })
 
 FarmTab:CreateToggle({
@@ -173,21 +260,18 @@ FarmTab:CreateToggle({
                 if #upgradeRemotes == 0 then
                     Rayfield:Notify({Title = "⚠️", Content = "Không tìm thấy Remote nâng cấp nào!", Duration = 3})
                     _G_AutoUpgrade = false
-                    setToggleState("ToggleUpgrade", false)
+                    Rayfield:SetToggle("ToggleUpgrade", false)
                     return
                 end
 
                 local lastRescan = tick()
                 while _G_AutoUpgrade do
-                    -- Gọi tất cả remote nâng cấp
                     for _, remote in ipairs(upgradeRemotes) do
-                        pcall(function()
-                            remote:InvokeServer(1)
-                        end)
+                        safeInvokeUpgrade(remote)
+                        task.wait(0.01)
                     end
 
-                    -- Cứ 2 giây quét lại để cập nhật Tycoon mới
-                    if tick() - lastRescan > 2 then
+                    if tick() - lastRescan > 5 then
                         upgradeRemotes = scanUpgradeRemotes()
                         lastRescan = tick()
                     end
@@ -198,6 +282,28 @@ FarmTab:CreateToggle({
             end)
         else
             Rayfield:Notify({Title = "⏹️", Content = "Đã tắt tự động nâng cấp!", Duration = 3})
+        end
+    end
+})
+
+-- Toggle xây dựng nhà
+FarmTab:CreateToggle({
+    Name = "Tự động xây dựng nhà",
+    CurrentValue = false,
+    Flag = "ToggleBuildHouse",
+    Callback = function(Value)
+        _G_AutoBuild = Value
+        if _G_AutoBuild then
+            Rayfield:Notify({Title = "✅", Content = "Đã bật tự động xây dựng nhà!", Duration = 3})
+            task.spawn(function()
+                while _G_AutoBuild do
+                    BuildHouseOnce()
+                    task.wait(0.1) -- mỗi 0.1 giây
+                end
+                Rayfield:Notify({Title = "⏹️", Content = "Đã dừng tự động xây dựng nhà!", Duration = 3})
+            end)
+        else
+            Rayfield:Notify({Title = "⏹️", Content = "Đã tắt tự động xây dựng nhà!", Duration = 3})
         end
     end
 })
@@ -237,5 +343,58 @@ HarvestTab:CreateToggle({
     end
 })
 
+-- Toggle Nhặt bao tiền
+HarvestTab:CreateToggle({
+    Name = "Nhặt bao tiền",
+    CurrentValue = false,
+    Flag = "ToggleCollectMoney",
+    Callback = function(Value)
+        _G_AutoRedeem = Value
+        if _G_AutoRedeem then
+            Rayfield:Notify({Title = "✅", Content = "Đã bật nhặt bao tiền (1-1500)!", Duration = 3})
+            task.spawn(function()
+                while _G_AutoRedeem do
+                    CollectMoneyOnce()
+                    task.wait(0.01)
+                end
+                Rayfield:Notify({Title = "⏹️", Content = "Đã dừng nhặt bao tiền!", Duration = 3})
+            end)
+        else
+            Rayfield:Notify({Title = "⏹️", Content = "Đã tắt nhặt bao tiền!", Duration = 3})
+        end
+    end
+})
+
+-- ============================
+-- TAB CLICK
+-- ============================
+local ClickTab = Window:CreateTab("Click", 4483362458)
+
+ClickTab:CreateParagraph({
+    Title = "🖱️ Auto Click LemonStand",
+    Content = "Bật để tự động gửi WakeIncomeStream với 'LemonStand' mỗi 0.1 giây trên tất cả Tycoon."
+})
+
+ClickTab:CreateToggle({
+    Name = "Auto Click LemonStand",
+    CurrentValue = false,
+    Flag = "ToggleClickLemonStand",
+    Callback = function(Value)
+        _G_AutoClickLemonStand = Value
+        if _G_AutoClickLemonStand then
+            Rayfield:Notify({Title = "✅", Content = "Đã bật Auto Click LemonStand!", Duration = 3})
+            task.spawn(function()
+                while _G_AutoClickLemonStand do
+                    ClickLemonStandOnce()
+                    task.wait(0.1)
+                end
+                Rayfield:Notify({Title = "⏹️", Content = "Đã dừng Auto Click LemonStand!", Duration = 3})
+            end)
+        else
+            Rayfield:Notify({Title = "⏹️", Content = "Đã tắt Auto Click LemonStand!", Duration = 3})
+        end
+    end
+})
+
 -- Thông báo khởi tạo
-Rayfield:Notify({Title = "🍋", Content = "Script đã sẵn sàng!", Duration = 3})
+Rayfield:Notify({Title = "🍋", Content = "MENU BÁN CHANH V2.550 đã sẵn sàng!", Duration = 3})
