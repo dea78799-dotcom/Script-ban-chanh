@@ -3,7 +3,7 @@ local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 -- [[ CỬA SỔ CHÍNH ]]
 local Window = Rayfield:CreateWindow({
-   Name = "🍋 Menu bán chanh v2.562 (Fixed All)",
+   Name = "🍋menu bán chanh🍋 v3.255",
    Icon = 0,
    LoadingTitle = "Đang tải...",
    LoadingSubtitle = "by Assistant",
@@ -115,7 +115,7 @@ local function DoUpgrade(amount)
 end
 
 -- ============================
--- HÀM THỰC HIỆN TÁI SINH (RSPY FIX)
+-- HÀM THỰC HIỆN TÁI SINH
 -- ============================
 local function DoRebirth()
     pcall(function()
@@ -139,7 +139,7 @@ local function DoRebirth()
 end
 
 -- ============================
--- HÀM ĐỒNG Ý HỢP ĐỒNG (PHONE OFFER)
+-- HÀM ĐỒNG Ý HỢP ĐỒNG
 -- ============================
 local function AcceptContract()
     pcall(function()
@@ -302,7 +302,7 @@ FarmTab:CreateSlider({
 
 FarmTab:CreateParagraph({
     Title = "🏠 Tự động xây nhà",
-    Content = "Sử dụng luồng riêng biệt, tắt là dừng ngay lập tức."
+    Content = "Sử dụng kết hợp cả chạm nút lẫn gửi Remote chuẩn."
 })
 
 FarmTab:CreateButton({
@@ -334,18 +334,38 @@ FarmTab:CreateToggle({
                 while _G_AutoBuild do
                     local myTycoon = getMyTycoon()
                     if myTycoon then
+                        -- Phương pháp 1: Tìm các nút bấm (Buttons) và kích hoạt bằng Touch
+                        local buttonsFolder = myTycoon:FindFirstChild("Buttons") or myTycoon:FindFirstChild("UnpurchasedButtons")
+                        if buttonsFolder then
+                            for _, btn in pairs(buttonsFolder:GetChildren()) do
+                                if not _G_AutoBuild then break end
+                                local head = btn:FindFirstChild("Head") or btn:FindFirstChildWhichIsA("BasePart")
+                                if head and firetouchinterest and RootPart then
+                                    firetouchinterest(RootPart, head, 0)
+                                    task.wait(0.01)
+                                    firetouchinterest(RootPart, head, 1)
+                                end
+                            end
+                        end
+
+                        -- Phương pháp 2: Gửi Remote trực tiếp cho toàn bộ các nút mua
                         for _, obj in pairs(myTycoon:GetDescendants()) do
                             if not _G_AutoBuild then break end
 
-                            if obj:IsA("RemoteFunction") and (obj.Name == "Purchase" or obj.Name == "PurchaseBuyEffect") then
-                                pcall(function() obj:InvokeServer(false, false) end)
-                            elseif obj:IsA("RemoteEvent") and (obj.Name == "Purchase" or obj.Name == "PurchaseBuyEffect") then
-                                pcall(function() obj:FireServer(false, false) end)
+                            if obj:IsA("RemoteFunction") then
+                                if obj.Name == "Purchase" or obj.Name == "PurchaseBuyEffect" or obj.Name == "Buy" then
+                                    pcall(function() obj:InvokeServer() end)
+                                    pcall(function() obj:InvokeServer(obj.Parent.Name) end)
+                                end
+                            elseif obj:IsA("RemoteEvent") then
+                                if obj.Name == "Purchase" or obj.Name == "PurchaseBuyEffect" or obj.Name == "Buy" then
+                                    pcall(function() obj:FireServer() end)
+                                    pcall(function() obj:FireServer(obj.Parent.Name) end)
+                                end
                             end
-                            task.wait(0.02)
                         end
                     end
-                    task.wait(0.5)
+                    task.wait(0.3)
                 end
             end)
         else
@@ -355,7 +375,7 @@ FarmTab:CreateToggle({
 })
 
 -- ============================
--- TAB HỢP ĐỒNG (NEW)
+-- TAB HỢP ĐỒNG
 -- ============================
 local ContractTab = Window:CreateTab("Hợp Đồng", 4483362458)
 
@@ -570,4 +590,4 @@ ClickTab:CreateToggle({
     end
 })
 
-Rayfield:Notify({Title = "🍋", Content = "Menu bán chanh v2.562 đã tải xong!", Duration = 3})
+Rayfield:Notify({Title = "🍋", Content = "🍋menu bán chanh🍋 v3.255 đã tải xong!", Duration = 3})
