@@ -3,7 +3,7 @@ local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 -- [[ CỬA SỔ CHÍNH ]]
 local Window = Rayfield:CreateWindow({
-   Name = "🍋menu bán chanh🍋 v3.258 (Fast Upgrade Fixed)",
+   Name = "🍋menu bán chanh🍋 v3.270 (Pet Added)",
    Icon = 0,
    LoadingTitle = "Đang tải...",
    LoadingSubtitle = "by Assistant",
@@ -37,12 +37,13 @@ local _G_AutoClickLemonLabs = false
 local _G_AutoClickLemonRobotics = false
 local _G_AutoBuild = false
 local _G_AutoRebirth = false
+local _G_AutoEvolve = false
 local _G_AutoOffer = false
 local _G_AutoRaiseOffer = false
 local _G_AutoRejectOffer = false
 local _G_AutoRollBall = false
 
-local UpgradeAmount = 10     -- Mặc định nâng 10 lần/nhịp cho nhanh
+local UpgradeAmount = 10
 local RebirthDelay = 15
 
 local Threads = {
@@ -55,6 +56,7 @@ local Threads = {
     LemonLabs = nil,
     LemonRobotics = nil,
     Rebirth = nil,
+    Evolve = nil,
     Offer = nil,
     RaiseOffer = nil,
     RejectOffer = nil,
@@ -62,42 +64,30 @@ local Threads = {
 }
 
 -- ============================
--- HÀM SUPPORT AUTO CLICK UI
+-- HÀM GIẢ LẬP CẢM ỨNG UI
 -- ============================
-local function triggerClick(button)
-    if not button then return end
+local function touchAtPosition(x, y)
+    VirtualInputManager:SendTouchEvent(0, 0, x, y, game)
+    task.wait(0.02)
+    VirtualInputManager:SendTouchEvent(0, 2, x, y, game)
+end
+
+local function clickGuiObject(guiObject)
+    if not guiObject then return end
     
     if firesignal then
-        pcall(function() firesignal(button.MouseButton1Click) end)
-        pcall(function() firesignal(button.Activated) end)
+        pcall(function() firesignal(guiObject.MouseButton1Click) end)
+        pcall(function() firesignal(guiObject.Activated) end)
     else
-        local pos = button.AbsolutePosition
-        local size = button.AbsoluteSize
+        local pos = guiObject.AbsolutePosition
+        local size = guiObject.AbsoluteSize
         local inset = GuiService:GetGuiInset()
         
         local x = pos.X + (size.X / 2)
         local y = pos.Y + (size.Y / 2) + inset.Y
         
-        VirtualInputManager:SendMouseButtonEvent(x, y, 0, true, game, 0)
-        task.wait(0.01)
-        VirtualInputManager:SendMouseButtonEvent(x, y, 0, false, game, 0)
+        touchAtPosition(x, y)
     end
-end
-
-local function ClickCenterScreen()
-    pcall(function()
-        local camera = Workspace.CurrentCamera
-        if not camera then return end
-        local viewportSize = camera.ViewportSize
-        local inset = GuiService:GetGuiInset()
-
-        local centerX = viewportSize.X * 0.5
-        local centerY = (viewportSize.Y * 0.5) + inset.Y
-
-        VirtualInputManager:SendMouseButtonEvent(centerX, centerY, 0, true, game, 0)
-        task.wait(0.02)
-        VirtualInputManager:SendMouseButtonEvent(centerX, centerY, 0, false, game, 0)
-    end)
 end
 
 -- ============================
@@ -142,6 +132,14 @@ local function getMyTycoon()
 end
 
 -- ============================
+-- HÀM DỊCH CHUYỂN BẰNG CFRAME
+-- ============================
+local function teleportCFrame(cframe)
+    if not RootPart then return end
+    RootPart.CFrame = cframe
+end
+
+-- ============================
 -- HÀM MUA NÔNG TRẠI (UNLOCK ORCHARD)
 -- ============================
 local function BuyOrchard()
@@ -164,7 +162,7 @@ local function BuyOrchard()
 end
 
 -- ============================
--- HÀM THỰC HIỆN NÂNG CẤP (SIÊU TOC & BẤT ĐỒNG BỘ)
+-- HÀM THỰC HIỆN NÂNG CẤP
 -- ============================
 local function DoUpgrade(amount)
     if not _G_AutoUpgrade then return end
@@ -215,6 +213,61 @@ local function DoRebirth()
 end
 
 -- ============================
+-- HÀM THỰC HIỆN TÁI SINH TRÁI (EVOLVE)
+-- ============================
+local function DoEvolve()
+    pcall(function()
+        local myTycoon = getMyTycoon()
+        local evolveRemote = nil
+
+        if myTycoon and myTycoon:FindFirstChild("Remotes") and myTycoon.Remotes:FindFirstChild("Evolve") then
+            evolveRemote = myTycoon.Remotes.Evolve
+        elseif Workspace:FindFirstChild("Tycoon4") and Workspace.Tycoon4:FindFirstChild("Remotes") and Workspace.Tycoon4.Remotes:FindFirstChild("Evolve") then
+            evolveRemote = Workspace.Tycoon4.Remotes.Evolve
+        else
+            evolveRemote = Workspace:FindFirstChild("Evolve", true)
+        end
+
+        if evolveRemote then
+            if evolveRemote:IsA("RemoteFunction") then
+                evolveRemote:InvokeServer(nil)
+            elseif evolveRemote:IsA("RemoteEvent") then
+                evolveRemote:FireServer(nil)
+            end
+        end
+    end)
+end
+
+-- ============================
+-- HÀM LẤY PET SLIME
+-- ============================
+local function ClaimSlimePet()
+    pcall(function()
+        local myTycoon = getMyTycoon()
+        local claimRemote = nil
+
+        if myTycoon and myTycoon:FindFirstChild("Remotes") and myTycoon.Remotes:FindFirstChild("ClaimCompanion") then
+            claimRemote = myTycoon.Remotes.ClaimCompanion
+        elseif Workspace:FindFirstChild("Tycoon3") and Workspace.Tycoon3:FindFirstChild("Remotes") and Workspace.Tycoon3.Remotes:FindFirstChild("ClaimCompanion") then
+            claimRemote = Workspace.Tycoon3.Remotes.ClaimCompanion
+        else
+            claimRemote = Workspace:FindFirstChild("ClaimCompanion", true)
+        end
+
+        if claimRemote then
+            if claimRemote:IsA("RemoteFunction") then
+                claimRemote:InvokeServer(2)
+            elseif claimRemote:IsA("RemoteEvent") then
+                claimRemote:FireServer(2)
+            end
+            Rayfield:Notify({Title = "🧪", Content = "Đã gửi lệnh nhận Pet Slime!", Duration = 3})
+        else
+            Rayfield:Notify({Title = "⚠️ Lỗi", Content = "Không tìm thấy Remote nhận Pet!", Duration = 3})
+        end
+    end)
+end
+
+-- ============================
 -- HÀM XỬ LÝ HỢP ĐỒNG (OFFER)
 -- ============================
 local function SendOfferAction(actionType)
@@ -239,14 +292,6 @@ end
 local function AcceptContract() SendOfferAction("Accept") end
 local function RaiseContract() SendOfferAction("Raise") end
 local function RejectContract() SendOfferAction("Reject") end
-
--- ============================
--- HÀM DỊCH CHUYỂN TỨC THÌ
--- ============================
-local function instantTeleport(pos)
-    if not RootPart then return end
-    RootPart.CFrame = CFrame.new(pos)
-end
 
 -- ============================
 -- HÀM TÌM QUẢ "Fruit" TRONG LemonTree
@@ -297,7 +342,7 @@ local function HarvestOnce()
     for _, fruit in ipairs(fruits) do
         if not _G_AutoHarvest then break end
         if fruit and fruit.Parent then
-            instantTeleport(fruit.Position)
+            teleportCFrame(CFrame.new(fruit.Position + Vector3.new(0, 2, 0)))
             task.wait(0.02)
             ClickFruit(fruit)
             task.wait(0.02)
@@ -483,10 +528,36 @@ MiniGameTab:CreateToggle({
             Rayfield:Notify({Title = "⚽", Content = "Đã BẬT quy trình Lăn Bóng!", Duration = 2})
             Threads.RollBall = task.spawn(function()
                 while _G_AutoRollBall do
-                    -- 1. Bay tới vị trí lăn bóng
-                    instantTeleport(Vector3.new(-37.0306396, 3.80099916, 68.5796432))
+                    local myTycoon = getMyTycoon()
+                    local targetCFrame = nil
+
+                    if myTycoon then
+                        local tName = myTycoon.Name
+                        if tName == "Tycoon1" then
+                            targetCFrame = CFrame.new(35.0306549, 6.0, -428.579681, -1, 0, 0, 0, 1, 0, 0, 0, -1)
+                        elseif tName == "Tycoon2" then
+                            targetCFrame = CFrame.new(35.0306549, 6.0, -248.579666, -1, 0, 0, 0, 1, 0, 0, 0, -1)
+                        elseif tName == "Tycoon3" then
+                            targetCFrame = CFrame.new(35.0306549, 6.0, -68.5796585, -1, 0, 0, 0, 1, 0, 0, 0, -1)
+                        elseif tName == "Tycoon4" then
+                            targetCFrame = CFrame.new(35.0306549, 6.0, 111.420341, -1, 0, 0, 0, 1, 0, 0, 0, -1)
+                        elseif tName == "Tycoon6" then
+                            targetCFrame = CFrame.new(-35.0306129, 6.0, 428.579681, 1, 0, 0, 0, 1, 0, 0, 0, 1)
+                        elseif tName == "Tycoon7" then
+                            targetCFrame = CFrame.new(-35.0306282, 6.0, 248.579666, 1, 0, 0, 0, 1, 0, 0, 0, 1)
+                        elseif tName == "Tycoon8" then
+                            targetCFrame = CFrame.new(-35.0306473, 6.0, 68.5796585, 1, 0, 0, 0, 1, 0, 0, 0, 1)
+                        elseif tName == "Tycoon9" then
+                            targetCFrame = CFrame.new(-35.0306625, 6.0, -111.420341, 1, 0, 0, 0, 1, 0, 0, 0, 1)
+                        end
+                    end
+
+                    if not targetCFrame then
+                        targetCFrame = CFrame.new(-35.0306473, 6.0, 68.5796585)
+                    end
+
+                    teleportCFrame(targetCFrame)
                     
-                    -- 2. Chạy Remote Start Minigame
                     pcall(function()
                         local event = ReplicatedStorage:WaitForChild("Core", 3)
                             :WaitForChild("RemoteRequest", 3)
@@ -499,7 +570,6 @@ MiniGameTab:CreateToggle({
                     task.wait(0.2)
                     if not _G_AutoRollBall then break end
 
-                    -- 3. Tìm và click nút "Chọn" số 2
                     local playerGui = Player:WaitForChild("PlayerGui")
                     local chonButtons = {}
 
@@ -516,10 +586,9 @@ MiniGameTab:CreateToggle({
                     end)
 
                     if #chonButtons >= 2 then
-                        triggerClick(chonButtons[2])
+                        clickGuiObject(chonButtons[2])
                     end
 
-                    -- 4. Chờ 0.5s và SPAM nút "Cổ vũ" trong 20s
                     task.wait(0.5)
 
                     local startTime = tick()
@@ -535,7 +604,7 @@ MiniGameTab:CreateToggle({
                         end
                         
                         if coVuBtn then
-                            triggerClick(coVuBtn)
+                            clickGuiObject(coVuBtn)
                         end
                         
                         task.wait(0.07)
@@ -543,10 +612,22 @@ MiniGameTab:CreateToggle({
 
                     if not _G_AutoRollBall then break end
 
-                    -- 5. Click vào giữa màn hình
-                    ClickCenterScreen()
+                    task.wait(5)
 
-                    task.wait(1) -- Chờ trước khi lặp lại vòng mới
+                    if _G_AutoRollBall then
+                        local camera = Workspace.CurrentCamera
+                        if camera then
+                            local viewportSize = camera.ViewportSize
+                            local inset = GuiService:GetGuiInset()
+
+                            local centerX = viewportSize.X * 0.5
+                            local centerY = (viewportSize.Y * 0.5) + inset.Y
+
+                            touchAtPosition(centerX, centerY)
+                        end
+                    end
+
+                    task.wait(1)
                 end
             end)
         else
@@ -715,6 +796,47 @@ RebirthTab:CreateToggle({
     end
 })
 
+RebirthTab:CreateParagraph({
+    Title = "🍋 Tái sinh trái (Evolve)",
+    Content = "Thực hiện tiến hóa/tái sinh trái cây trong Tycoon."
+})
+
+RebirthTab:CreateButton({
+    Name = "Tái sinh trái",
+    Callback = function()
+        DoEvolve()
+        Rayfield:Notify({Title = "🍋", Content = "Đã thực hiện Tái sinh trái!", Duration = 2})
+    end,
+})
+
+RebirthTab:CreateToggle({
+    Name = "tự động tái sinh trái",
+    CurrentValue = false,
+    Flag = "ToggleAutoEvolve",
+    Callback = function(Value)
+        _G_AutoEvolve = Value
+        if Threads.Evolve then
+            task.cancel(Threads.Evolve)
+            Threads.Evolve = nil
+        end
+
+        if _G_AutoEvolve then
+            Rayfield:Notify({Title = "🍋", Content = "Đã BẬT tự động tái sinh trái (Mỗi 30s)!", Duration = 3})
+            Threads.Evolve = task.spawn(function()
+                while _G_AutoEvolve do
+                    DoEvolve()
+                    for i = 1, 30 do
+                        if not _G_AutoEvolve then break end
+                        task.wait(1)
+                    end
+                end
+            end)
+        else
+            Rayfield:Notify({Title = "⏹️", Content = "Đã TẮT tự động tái sinh trái!", Duration = 2})
+        end
+    end
+})
+
 -- ============================
 -- TAB AUTO HARVEST
 -- ============================
@@ -857,4 +979,21 @@ ClickTab:CreateToggle({
     end
 })
 
-Rayfield:Notify({Title = "🍋", Content = "🍋menu bán chanh🍋 v3.258 đã sẵn sàng!", Duration = 3})
+-- ============================
+-- TAB PET
+-- ============================
+local PetTab = Window:CreateTab("Pet", 4483362458)
+
+PetTab:CreateParagraph({
+    Title = "⚠️ LƯU Ý",
+    Content = "Bạn cần phải hoàn thành nhiệm vụ mới lấy được do tab pet đang sửa chữa"
+})
+
+PetTab:CreateButton({
+    Name = "Lấy pet slime",
+    Callback = function()
+        ClaimSlimePet()
+    end,
+})
+
+Rayfield:Notify({Title = "🍋", Content = "🍋menu bán chanh🍋 v3.270 đã sẵn sàng!", Duration = 3})
