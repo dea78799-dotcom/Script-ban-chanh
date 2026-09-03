@@ -3,7 +3,7 @@ local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 -- [[ CỬA SỔ CHÍNH ]]
 local Window = Rayfield:CreateWindow({
-   Name = "🍋 Menu bán chanh v2.562 (Fixed & Rebirth)",
+   Name = "🍋 Menu bán chanh v2.562 (Fixed All)",
    Icon = 0,
    LoadingTitle = "Đang tải...",
    LoadingSubtitle = "by Assistant",
@@ -34,6 +34,7 @@ local _G_AutoClickLemonDash = false
 local _G_AutoClickLemonLabs = false
 local _G_AutoBuild = false
 local _G_AutoRebirth = false
+local _G_AutoOffer = false
 
 local UpgradeAmount = 1      -- Mặc định nâng cấp 1 lần
 local RebirthDelay = 15      -- Mặc định 15 phút
@@ -46,7 +47,8 @@ local Threads = {
     LemonStand = nil,
     LemonDash = nil,
     LemonLabs = nil,
-    Rebirth = nil
+    Rebirth = nil,
+    Offer = nil
 }
 
 -- ============================
@@ -100,7 +102,6 @@ local function DoUpgrade(amount)
     local purchases = tycoon:FindFirstChild("Purchases")
     if purchases then
         for _, item in pairs(purchases:GetChildren()) do
-            -- Quét đường dẫn Purchases -> [Item] -> [Item] -> [Item] -> Upgrade
             local upgradeRemote = item:FindFirstChild("Upgrade", true)
             if upgradeRemote and upgradeRemote:IsA("RemoteFunction") then
                 coroutine.wrap(function()
@@ -114,19 +115,45 @@ local function DoUpgrade(amount)
 end
 
 -- ============================
--- HÀM THỰC HIỆN TÁI SINH
+-- HÀM THỰC HIỆN TÁI SINH (RSPY FIX)
 -- ============================
 local function DoRebirth()
     pcall(function()
-        local rebirthRemote = ReplicatedStorage:FindFirstChild("Rebirth", true) 
-            or Workspace:FindFirstChild("Rebirth", true)
+        local myTycoon = getMyTycoon()
+        local rebirthRemote = nil
         
+        if myTycoon and myTycoon:FindFirstChild("Remotes") and myTycoon.Remotes:FindFirstChild("Rebirth") then
+            rebirthRemote = myTycoon.Remotes.Rebirth
+        else
+            rebirthRemote = Workspace:FindFirstChild("Rebirth", true) or ReplicatedStorage:FindFirstChild("Rebirth", true)
+        end
+
         if rebirthRemote then
             if rebirthRemote:IsA("RemoteFunction") then
-                rebirthRemote:InvokeServer()
+                rebirthRemote:InvokeServer(nil)
             elseif rebirthRemote:IsA("RemoteEvent") then
-                rebirthRemote:FireServer()
+                rebirthRemote:FireServer(nil)
             end
+        end
+    end)
+end
+
+-- ============================
+-- HÀM ĐỒNG Ý HỢP ĐỒNG (PHONE OFFER)
+-- ============================
+local function AcceptContract()
+    pcall(function()
+        local myTycoon = getMyTycoon()
+        local offerRemote = nil
+        
+        if myTycoon and myTycoon:FindFirstChild("Remotes") and myTycoon.Remotes:FindFirstChild("PhoneOffer") then
+            offerRemote = myTycoon.Remotes.PhoneOffer
+        else
+            offerRemote = Workspace:FindFirstChild("PhoneOffer", true)
+        end
+
+        if offerRemote then
+            offerRemote:FireServer("Accept")
         end
     end)
 end
@@ -311,21 +338,56 @@ FarmTab:CreateToggle({
                             if not _G_AutoBuild then break end
 
                             if obj:IsA("RemoteFunction") and (obj.Name == "Purchase" or obj.Name == "PurchaseBuyEffect") then
-                                coroutine.wrap(function()
-                                    pcall(function() obj:InvokeServer(false, false) end)
-                                end)()
+                                pcall(function() obj:InvokeServer(false, false) end)
                             elseif obj:IsA("RemoteEvent") and (obj.Name == "Purchase" or obj.Name == "PurchaseBuyEffect") then
-                                coroutine.wrap(function()
-                                    pcall(function() obj:FireServer(false, false) end)
-                                end)()
+                                pcall(function() obj:FireServer(false, false) end)
                             end
+                            task.wait(0.02)
                         end
                     end
-                    task.wait(0.1)
+                    task.wait(0.5)
                 end
             end)
         else
             Rayfield:Notify({Title = "⏹️", Content = "Đã TẮT tự động xây nhà hoàn toàn!", Duration = 2})
+        end
+    end
+})
+
+-- ============================
+-- TAB HỢP ĐỒNG (NEW)
+-- ============================
+local ContractTab = Window:CreateTab("Hợp Đồng", 4483362458)
+
+ContractTab:CreateButton({
+    Name = "Đồng ý hợp đồng",
+    Callback = function()
+        AcceptContract()
+        Rayfield:Notify({Title = "📜", Content = "Đã gửi lệnh đồng ý hợp đồng!", Duration = 2})
+    end,
+})
+
+ContractTab:CreateToggle({
+    Name = "Tự động đồng ý",
+    CurrentValue = false,
+    Flag = "ToggleAutoOffer",
+    Callback = function(Value)
+        _G_AutoOffer = Value
+        if Threads.Offer then
+            task.cancel(Threads.Offer)
+            Threads.Offer = nil
+        end
+
+        if _G_AutoOffer then
+            Rayfield:Notify({Title = "📜", Content = "Đã BẬT tự động đồng ý hợp đồng (5s/lần)!", Duration = 2})
+            Threads.Offer = task.spawn(function()
+                while _G_AutoOffer do
+                    AcceptContract()
+                    task.wait(5)
+                end
+            end)
+        else
+            Rayfield:Notify({Title = "⏹️", Content = "Đã TẮT tự động đồng ý hợp đồng!", Duration = 2})
         end
     end
 })
@@ -372,7 +434,6 @@ RebirthTab:CreateToggle({
                 while _G_AutoRebirth do
                     local totalWaitSeconds = RebirthDelay * 60
                     
-                    -- Đếm ngược theo từng giây để dừng ngay lập tức khi bấm TẮT
                     for i = 1, totalWaitSeconds do
                         if not _G_AutoRebirth then break end
                         task.wait(1)
