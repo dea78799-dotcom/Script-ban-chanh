@@ -3,7 +3,7 @@ local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 -- [[ CỬA SỔ CHÍNH ]]
 local Window = Rayfield:CreateWindow({
-   Name = "🍋Menu bán chanh v2.562 (Fixed)",
+   Name = "🍋 Menu bán chanh v2.562 (Fixed & Rebirth)",
    Icon = 0,
    LoadingTitle = "Đang tải...",
    LoadingSubtitle = "by Assistant",
@@ -25,7 +25,7 @@ Player.CharacterAdded:Connect(function(newChar)
     RootPart = Character:WaitForChild("HumanoidRootPart")
 end)
 
--- STATE & THREADS (Quản lý luồng để tắt triệt để)
+-- STATE & THREADS & VALUES
 local _G_AutoUpgrade = false
 local _G_AutoHarvest = false
 local _G_AutoRedeem = false
@@ -33,6 +33,10 @@ local _G_AutoClickLemonStand = false
 local _G_AutoClickLemonDash = false
 local _G_AutoClickLemonLabs = false
 local _G_AutoBuild = false
+local _G_AutoRebirth = false
+
+local UpgradeAmount = 1      -- Mặc định nâng cấp 1 lần
+local RebirthDelay = 15      -- Mặc định 15 phút
 
 local Threads = {
     Upgrade = nil,
@@ -41,7 +45,8 @@ local Threads = {
     Redeem = nil,
     LemonStand = nil,
     LemonDash = nil,
-    LemonLabs = nil
+    LemonLabs = nil,
+    Rebirth = nil
 }
 
 -- ============================
@@ -86,24 +91,44 @@ local function getMyTycoon()
 end
 
 -- ============================
--- HÀM TÌM REMOTE NÂNG CẤP
+-- HÀM THỰC HIỆN NÂNG CẤP
 -- ============================
-local upgradeKeywords = {"LemonDash", "Lemon Stand", "Lemon Depot", "Lemon Trading"}
+local function DoUpgrade(amount)
+    local tycoon = getMyTycoon() or Workspace:FindFirstChild("Tycoon2")
+    if not tycoon then return end
 
-local function scanUpgradeRemotes()
-    local remotes = {}
-    for _, v in pairs(game:GetDescendants()) do
-        if v:IsA("RemoteFunction") and v.Name == "Upgrade" then
-            local path = v:GetFullName()
-            for _, keyword in ipairs(upgradeKeywords) do
-                if path:find(keyword, 1, true) then
-                    table.insert(remotes, v)
-                    break
-                end
+    local purchases = tycoon:FindFirstChild("Purchases")
+    if purchases then
+        for _, item in pairs(purchases:GetChildren()) do
+            -- Quét đường dẫn Purchases -> [Item] -> [Item] -> [Item] -> Upgrade
+            local upgradeRemote = item:FindFirstChild("Upgrade", true)
+            if upgradeRemote and upgradeRemote:IsA("RemoteFunction") then
+                coroutine.wrap(function()
+                    pcall(function()
+                        upgradeRemote:InvokeServer(amount)
+                    end)
+                end)()
             end
         end
     end
-    return remotes
+end
+
+-- ============================
+-- HÀM THỰC HIỆN TÁI SINH
+-- ============================
+local function DoRebirth()
+    pcall(function()
+        local rebirthRemote = ReplicatedStorage:FindFirstChild("Rebirth", true) 
+            or Workspace:FindFirstChild("Rebirth", true)
+        
+        if rebirthRemote then
+            if rebirthRemote:IsA("RemoteFunction") then
+                rebirthRemote:InvokeServer()
+            elseif rebirthRemote:IsA("RemoteEvent") then
+                rebirthRemote:FireServer()
+            end
+        end
+    end)
 end
 
 -- ============================
@@ -208,7 +233,7 @@ local FarmTab = Window:CreateTab("Farm", 4483362458)
 
 FarmTab:CreateParagraph({
     Title = "⚡ Nâng cấp Cực Nhanh",
-    Content = "Tự động gửi gói tin nâng cấp liên tục không chờ server."
+    Content = "Tự động gửi gói tin nâng cấp dựa trên số lần chọn trên thanh kéo."
 })
 
 FarmTab:CreateToggle({
@@ -223,35 +248,29 @@ FarmTab:CreateToggle({
         end
 
         if _G_AutoUpgrade then
-            Rayfield:Notify({Title = "⚡", Content = "Đã bật nâng cấp siêu tốc!", Duration = 2})
+            Rayfield:Notify({Title = "⚡", Content = "Đã bật tự động nâng cấp!", Duration = 2})
             Threads.Upgrade = task.spawn(function()
-                local upgradeRemotes = scanUpgradeRemotes()
-                local count = 0
-
                 while _G_AutoUpgrade do
-                    if #upgradeRemotes > 0 then
-                        for _, remote in ipairs(upgradeRemotes) do
-                            if not _G_AutoUpgrade then break end
-                            -- Bắn dữ liệu nâng cấp không chờ (No-Wait / Non-Blocking)
-                            coroutine.wrap(function()
-                                pcall(function() remote:InvokeServer(1) end)
-                            end)()
-                        end
-                    end
-
-                    count = count + 1
-                    if count >= 10 then
-                        upgradeRemotes = scanUpgradeRemotes()
-                        count = 0
-                    end
-
-                    task.wait(0.001) -- Bắn liên tục
+                    DoUpgrade(UpgradeAmount)
+                    task.wait(0.1)
                 end
             end)
         else
             Rayfield:Notify({Title = "⏹️", Content = "Đã TẮT nâng cấp hoàn toàn!", Duration = 2})
         end
     end
+})
+
+FarmTab:CreateSlider({
+    Name = "Nâng cấp 1 lần bao nhiêu",
+    Range = {1, 300},
+    Increment = 1,
+    Suffix = "lần",
+    CurrentValue = 1,
+    Flag = "SliderUpgradeAmount",
+    Callback = function(Value)
+        UpgradeAmount = Value
+    end,
 })
 
 FarmTab:CreateParagraph({
@@ -307,6 +326,65 @@ FarmTab:CreateToggle({
             end)
         else
             Rayfield:Notify({Title = "⏹️", Content = "Đã TẮT tự động xây nhà hoàn toàn!", Duration = 2})
+        end
+    end
+})
+
+-- ============================
+-- TAB TÁI SINH (REBIRTH)
+-- ============================
+local RebirthTab = Window:CreateTab("Tái Sinh", 4483362458)
+
+RebirthTab:CreateButton({
+    Name = "Tái sinh",
+    Callback = function()
+        DoRebirth()
+        Rayfield:Notify({Title = "🔄", Content = "Đã thực hiện tái sinh!", Duration = 2})
+    end,
+})
+
+RebirthTab:CreateSlider({
+    Name = "Thời gian tái sinh (Phút)",
+    Range = {1, 180},
+    Increment = 1,
+    Suffix = "phút",
+    CurrentValue = 15,
+    Flag = "SliderRebirthDelay",
+    Callback = function(Value)
+        RebirthDelay = Value
+    end,
+})
+
+RebirthTab:CreateToggle({
+    Name = "Tự động tái sinh",
+    CurrentValue = false,
+    Flag = "ToggleAutoRebirth",
+    Callback = function(Value)
+        _G_AutoRebirth = Value
+        if Threads.Rebirth then
+            task.cancel(Threads.Rebirth)
+            Threads.Rebirth = nil
+        end
+
+        if _G_AutoRebirth then
+            Rayfield:Notify({Title = "🔄", Content = "Đã BẬT tự động tái sinh sau mỗi " .. RebirthDelay .. " phút!", Duration = 3})
+            Threads.Rebirth = task.spawn(function()
+                while _G_AutoRebirth do
+                    local totalWaitSeconds = RebirthDelay * 60
+                    
+                    -- Đếm ngược theo từng giây để dừng ngay lập tức khi bấm TẮT
+                    for i = 1, totalWaitSeconds do
+                        if not _G_AutoRebirth then break end
+                        task.wait(1)
+                    end
+
+                    if _G_AutoRebirth then
+                        DoRebirth()
+                    end
+                end
+            end)
+        else
+            Rayfield:Notify({Title = "⏹️", Content = "Đã TẮT tự động tái sinh!", Duration = 2})
         end
     end
 })
@@ -431,4 +509,4 @@ ClickTab:CreateToggle({
     end
 })
 
-Rayfield:Notify({Title = "🍋", Content = "Menu bán chanh v2.562 đã sẵn sàng!", Duration = 3})
+Rayfield:Notify({Title = "🍋", Content = "Menu bán chanh v2.562 đã tải xong!", Duration = 3})
