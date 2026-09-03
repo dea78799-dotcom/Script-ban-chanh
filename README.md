@@ -35,6 +35,8 @@ local _G_AutoClickLemonLabs = false
 local _G_AutoBuild = false
 local _G_AutoRebirth = false
 local _G_AutoOffer = false
+local _G_AutoRaiseOffer = false
+local _G_AutoRejectOffer = false
 
 local UpgradeAmount = 1      -- Mặc định nâng cấp 1 lần
 local RebirthDelay = 15      -- Mặc định 15 phút
@@ -48,7 +50,9 @@ local Threads = {
     LemonDash = nil,
     LemonLabs = nil,
     Rebirth = nil,
-    Offer = nil
+    Offer = nil,
+    RaiseOffer = nil,
+    RejectOffer = nil
 }
 
 -- ============================
@@ -139,23 +143,37 @@ local function DoRebirth()
 end
 
 -- ============================
--- HÀM ĐỒNG Ý HỢP ĐỒNG
+-- HÀM XỬ LÝ HỢP ĐỒNG (OFFER)
 -- ============================
-local function AcceptContract()
+local function SendOfferAction(actionType)
     pcall(function()
         local myTycoon = getMyTycoon()
         local offerRemote = nil
         
         if myTycoon and myTycoon:FindFirstChild("Remotes") and myTycoon.Remotes:FindFirstChild("PhoneOffer") then
             offerRemote = myTycoon.Remotes.PhoneOffer
+        elseif Workspace:FindFirstChild("Tycoon7") and Workspace.Tycoon7:FindFirstChild("Remotes") and Workspace.Tycoon7.Remotes:FindFirstChild("PhoneOffer") then
+            offerRemote = Workspace.Tycoon7.Remotes.PhoneOffer
         else
             offerRemote = Workspace:FindFirstChild("PhoneOffer", true)
         end
 
         if offerRemote then
-            offerRemote:FireServer("Accept")
+            offerRemote:FireServer(actionType)
         end
     end)
+end
+
+local function AcceptContract()
+    SendOfferAction("Accept")
+end
+
+local function RaiseContract()
+    SendOfferAction("Raise")
+end
+
+local function RejectContract()
+    SendOfferAction("Reject")
 end
 
 -- ============================
@@ -362,6 +380,7 @@ FarmTab:CreateToggle({
 -- ============================
 local ContractTab = Window:CreateTab("Hợp Đồng", 4483362458)
 
+-- 1. ĐỒNG Ý
 ContractTab:CreateButton({
     Name = "Đồng ý hợp đồng",
     Callback = function()
@@ -391,6 +410,74 @@ ContractTab:CreateToggle({
             end)
         else
             Rayfield:Notify({Title = "⏹️", Content = "Đã TẮT tự động đồng ý hợp đồng!", Duration = 2})
+        end
+    end
+})
+
+-- 2. KÊU THÊM TIỀN
+ContractTab:CreateButton({
+    Name = "thêm tiền hợp đồng",
+    Callback = function()
+        RaiseContract()
+        Rayfield:Notify({Title = "💵", Content = "Đã gửi lệnh kêu thêm tiền hợp đồng!", Duration = 2})
+    end,
+})
+
+ContractTab:CreateToggle({
+    Name = "tự động kêu thêm tiền",
+    CurrentValue = false,
+    Flag = "ToggleAutoRaiseOffer",
+    Callback = function(Value)
+        _G_AutoRaiseOffer = Value
+        if Threads.RaiseOffer then
+            task.cancel(Threads.RaiseOffer)
+            Threads.RaiseOffer = nil
+        end
+
+        if _G_AutoRaiseOffer then
+            Rayfield:Notify({Title = "💵", Content = "Đã BẬT tự động kêu thêm tiền (5s/lần)!", Duration = 2})
+            Threads.RaiseOffer = task.spawn(function()
+                while _G_AutoRaiseOffer do
+                    RaiseContract()
+                    task.wait(5)
+                end
+            end)
+        else
+            Rayfield:Notify({Title = "⏹️", Content = "Đã TẮT tự động kêu thêm tiền!", Duration = 2})
+        end
+    end
+})
+
+-- 3. TỪ CHỐI
+ContractTab:CreateButton({
+    Name = "từ chối hợp đồng",
+    Callback = function()
+        RejectContract()
+        Rayfield:Notify({Title = "❌", Content = "Đã gửi lệnh từ chối hợp đồng!", Duration = 2})
+    end,
+})
+
+ContractTab:CreateToggle({
+    Name = "tự động từ chối",
+    CurrentValue = false,
+    Flag = "ToggleAutoRejectOffer",
+    Callback = function(Value)
+        _G_AutoRejectOffer = Value
+        if Threads.RejectOffer then
+            task.cancel(Threads.RejectOffer)
+            Threads.RejectOffer = nil
+        end
+
+        if _G_AutoRejectOffer then
+            Rayfield:Notify({Title = "❌", Content = "Đã BẬT tự động từ chối hợp đồng (5s/lần)!", Duration = 2})
+            Threads.RejectOffer = task.spawn(function()
+                while _G_AutoRejectOffer do
+                    RejectContract()
+                    task.wait(5)
+                end
+            end)
+        else
+            Rayfield:Notify({Title = "⏹️", Content = "Đã TẮT tự động từ chối hợp đồng!", Duration = 2})
         end
     end
 })
