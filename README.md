@@ -3,7 +3,7 @@ local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 -- [[ CỬA SỔ CHÍNH ]]
 local Window = Rayfield:CreateWindow({
-   Name = "🍋menu bán chanh🍋 v3.257 (Added Lemon Robotics)",
+   Name = "🍋menu bán chanh🍋 v3.258 (Fast Upgrade Fixed)",
    Icon = 0,
    LoadingTitle = "Đang tải...",
    LoadingSubtitle = "by Assistant",
@@ -19,6 +19,8 @@ local Character = Player.Character or Player.CharacterAdded:Wait()
 local RootPart = Character:WaitForChild("HumanoidRootPart")
 local Workspace = game:GetService("Workspace")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local VirtualInputManager = game:GetService("VirtualInputManager")
+local GuiService = game:GetService("GuiService")
 
 Player.CharacterAdded:Connect(function(newChar)
     Character = newChar
@@ -38,9 +40,10 @@ local _G_AutoRebirth = false
 local _G_AutoOffer = false
 local _G_AutoRaiseOffer = false
 local _G_AutoRejectOffer = false
+local _G_AutoRollBall = false
 
-local UpgradeAmount = 1      -- Mặc định nâng cấp 1 lần
-local RebirthDelay = 15      -- Mặc định 15 phút
+local UpgradeAmount = 10     -- Mặc định nâng 10 lần/nhịp cho nhanh
+local RebirthDelay = 15
 
 local Threads = {
     Upgrade = nil,
@@ -54,8 +57,48 @@ local Threads = {
     Rebirth = nil,
     Offer = nil,
     RaiseOffer = nil,
-    RejectOffer = nil
+    RejectOffer = nil,
+    RollBall = nil
 }
+
+-- ============================
+-- HÀM SUPPORT AUTO CLICK UI
+-- ============================
+local function triggerClick(button)
+    if not button then return end
+    
+    if firesignal then
+        pcall(function() firesignal(button.MouseButton1Click) end)
+        pcall(function() firesignal(button.Activated) end)
+    else
+        local pos = button.AbsolutePosition
+        local size = button.AbsoluteSize
+        local inset = GuiService:GetGuiInset()
+        
+        local x = pos.X + (size.X / 2)
+        local y = pos.Y + (size.Y / 2) + inset.Y
+        
+        VirtualInputManager:SendMouseButtonEvent(x, y, 0, true, game, 0)
+        task.wait(0.01)
+        VirtualInputManager:SendMouseButtonEvent(x, y, 0, false, game, 0)
+    end
+end
+
+local function ClickCenterScreen()
+    pcall(function()
+        local camera = Workspace.CurrentCamera
+        if not camera then return end
+        local viewportSize = camera.ViewportSize
+        local inset = GuiService:GetGuiInset()
+
+        local centerX = viewportSize.X * 0.5
+        local centerY = (viewportSize.Y * 0.5) + inset.Y
+
+        VirtualInputManager:SendMouseButtonEvent(centerX, centerY, 0, true, game, 0)
+        task.wait(0.02)
+        VirtualInputManager:SendMouseButtonEvent(centerX, centerY, 0, false, game, 0)
+    end)
+end
 
 -- ============================
 -- HÀM TÌM TYCOON CỦA NGƯỜI CHƠI
@@ -99,46 +142,50 @@ local function getMyTycoon()
 end
 
 -- ============================
--- HÀM THỰC HIỆN NÂNG CẤP (ĐÃ SỬA LỖI TẮT KHÔNG DỪNG)
+-- HÀM MUA NÔNG TRẠI (UNLOCK ORCHARD)
+-- ============================
+local function BuyOrchard()
+    pcall(function()
+        local myTycoon = getMyTycoon() or Workspace:FindFirstChild("Tycoon7")
+        if myTycoon then
+            local remotes = myTycoon:FindFirstChild("Remotes")
+            if remotes then
+                local unlockOrchard = remotes:FindFirstChild("UnlockOrchard")
+                if unlockOrchard and unlockOrchard:IsA("RemoteFunction") then
+                    unlockOrchard:InvokeServer()
+                    Rayfield:Notify({Title = "🌳", Content = "Đã gửi lệnh Mua nông trại!", Duration = 3})
+                    return
+                end
+            end
+        end
+        Workspace:WaitForChild("Tycoon7"):WaitForChild("Remotes"):WaitForChild("UnlockOrchard"):InvokeServer()
+        Rayfield:Notify({Title = "🌳", Content = "Đã gửi lệnh Mua nông trại (Tycoon7)!", Duration = 3})
+    end)
+end
+
+-- ============================
+-- HÀM THỰC HIỆN NÂNG CẤP (SIÊU TOC & BẤT ĐỒNG BỘ)
 -- ============================
 local function DoUpgrade(amount)
     if not _G_AutoUpgrade then return end
     local tycoon = getMyTycoon() or Workspace:FindFirstChild("Tycoon2")
     if not tycoon then return end
 
-    -- 1. Nâng cấp Lemon Robotics
-    local robotUpgrade = nil
-    pcall(function()
-        robotUpgrade = tycoon:FindFirstChild("Purchases")
-            :FindFirstChild("Lemon Robotics")
-            :FindFirstChild("Lemon Robotics")
-            :FindFirstChild("Lemon Robotics")
-            :FindFirstChild("Upgrade")
-    end)
-
-    if robotUpgrade and robotUpgrade:IsA("RemoteFunction") then
-        for i = 1, amount do
-            if not _G_AutoUpgrade then return end
-            pcall(function()
-                robotUpgrade:InvokeServer(1)
-            end)
-        end
-    end
-
-    -- 2. Quét toàn bộ các hạng mục nâng cấp khác trong Tycoon
     local purchases = tycoon:FindFirstChild("Purchases")
-    if purchases then
-        for _, item in pairs(purchases:GetChildren()) do
-            if not _G_AutoUpgrade then return end
-            local upgradeRemote = item:FindFirstChild("Upgrade", true)
-            if upgradeRemote and upgradeRemote:IsA("RemoteFunction") then
+    if not purchases then return end
+
+    for _, item in pairs(purchases:GetDescendants()) do
+        if not _G_AutoUpgrade then break end
+
+        if item:IsA("RemoteFunction") and item.Name == "Upgrade" then
+            task.spawn(function()
                 for i = 1, amount do
-                    if not _G_AutoUpgrade then return end
+                    if not _G_AutoUpgrade then break end
                     pcall(function()
-                        upgradeRemote:InvokeServer(1)
+                        item:InvokeServer(1)
                     end)
                 end
-            end
+            end)
         end
     end
 end
@@ -189,17 +236,9 @@ local function SendOfferAction(actionType)
     end)
 end
 
-local function AcceptContract()
-    SendOfferAction("Accept")
-end
-
-local function RaiseContract()
-    SendOfferAction("Raise")
-end
-
-local function RejectContract()
-    SendOfferAction("Reject")
-end
+local function AcceptContract() SendOfferAction("Accept") end
+local function RaiseContract() SendOfferAction("Raise") end
+local function RejectContract() SendOfferAction("Reject") end
 
 -- ============================
 -- HÀM DỊCH CHUYỂN TỨC THÌ
@@ -308,19 +347,25 @@ end
 -- ============================
 local FarmTab = Window:CreateTab("Farm", 4483362458)
 
--- THÊM LƯU Ý THEO YÊU CẦU
 FarmTab:CreateParagraph({
     Title = "⚠️ LƯU Ý QUAN TRỌNG",
-    Content = "Khuyến cáo: KHÔNG ĐƯỢC BẬT 2 TÍNH NĂNG CÙNG 1 LÚC TRONG TAB FARM! Hãy tắt tính năng đang chạy trước khi bật tính năng mới để tránh xung đột dữ liệu."
+    Content = "Khuyến cáo: KHÔNG ĐƯỢC BẬT 2 TÍNH NĂNG CÙNG 1 LÚC TRONG TAB FARM! Hãy tắt tính năng đang chạy trước khi bật tính năng mới."
+})
+
+FarmTab:CreateButton({
+    Name = "Mua nông trại",
+    Callback = function()
+        BuyOrchard()
+    end,
 })
 
 FarmTab:CreateParagraph({
     Title = "⚡ Nâng cấp Cực Nhanh",
-    Content = "Tự động gửi gói tin nâng cấp dựa trên số lần chọn trên thanh kéo."
+    Content = "Tự động gửi gói tin nâng cấp liên tục không bị gián đoạn."
 })
 
 FarmTab:CreateToggle({
-    Name = "Nâng cấp (Cực Nhanh)",
+    Name = "Nâng cấp (Siêu Nhanh)",
     CurrentValue = false,
     Flag = "ToggleUpgrade",
     Callback = function(Value)
@@ -331,25 +376,25 @@ FarmTab:CreateToggle({
         end
 
         if _G_AutoUpgrade then
-            Rayfield:Notify({Title = "⚡", Content = "Đã bật tự động nâng cấp!", Duration = 2})
+            Rayfield:Notify({Title = "⚡", Content = "Đã bật tự động nâng cấp Siêu Nhanh!", Duration = 2})
             Threads.Upgrade = task.spawn(function()
                 while _G_AutoUpgrade do
                     DoUpgrade(UpgradeAmount)
-                    task.wait(0.05)
+                    task.wait(0.1)
                 end
             end)
         else
-            Rayfield:Notify({Title = "⏹️", Content = "Đã TẮT nâng cấp hoàn toàn!", Duration = 2})
+            Rayfield:Notify({Title = "⏹️", Content = "Đã TẮT nâng cấp!", Duration = 2})
         end
     end
 })
 
 FarmTab:CreateSlider({
-    Name = "Nâng cấp 1 lần bao nhiêu",
-    Range = {1, 300},
+    Name = "Số lần gửi lệnh / 1 nhịp",
+    Range = {1, 100},
     Increment = 1,
     Suffix = "lần",
-    CurrentValue = 1,
+    CurrentValue = 10,
     Flag = "SliderUpgradeAmount",
     Callback = function(Value)
         UpgradeAmount = Value
@@ -358,7 +403,7 @@ FarmTab:CreateSlider({
 
 FarmTab:CreateParagraph({
     Title = "🏠 Tự động xây nhà",
-    Content = "Khôi phục cơ chế cũ: Quét toàn bộ nút Remote trong Tycoon."
+    Content = "Mua các nút còn thiếu trong Tycoon."
 })
 
 FarmTab:CreateButton({
@@ -408,7 +453,104 @@ FarmTab:CreateToggle({
                 end
             end)
         else
-            Rayfield:Notify({Title = "⏹️", Content = "Đã TẮT tự động xây nhà hoàn toàn!", Duration = 2})
+            Rayfield:Notify({Title = "⏹️", Content = "Đã TẮT tự động xây nhà!", Duration = 2})
+        end
+    end
+})
+
+-- ============================
+-- TAB MINI GAME
+-- ============================
+local MiniGameTab = Window:CreateTab("Mini Game", 4483362458)
+
+MiniGameTab:CreateParagraph({
+    Title = "⚠️ LƯU Ý BẢO TRÌ",
+    Content = "Đang trong quá trình test/sửa, vui lòng đừng xài!"
+})
+
+MiniGameTab:CreateToggle({
+    Name = "Lăn bóng",
+    CurrentValue = false,
+    Flag = "ToggleRollBall",
+    Callback = function(Value)
+        _G_AutoRollBall = Value
+        if Threads.RollBall then
+            task.cancel(Threads.RollBall)
+            Threads.RollBall = nil
+        end
+
+        if _G_AutoRollBall then
+            Rayfield:Notify({Title = "⚽", Content = "Đã BẬT quy trình Lăn Bóng!", Duration = 2})
+            Threads.RollBall = task.spawn(function()
+                while _G_AutoRollBall do
+                    -- 1. Bay tới vị trí lăn bóng
+                    instantTeleport(Vector3.new(-37.0306396, 3.80099916, 68.5796432))
+                    
+                    -- 2. Chạy Remote Start Minigame
+                    pcall(function()
+                        local event = ReplicatedStorage:WaitForChild("Core", 3)
+                            :WaitForChild("RemoteRequest", 3)
+                            :WaitForChild("MinigameRaceService.Start", 3)
+                        if event and event:IsA("RemoteFunction") then
+                            event:InvokeServer()
+                        end
+                    end)
+
+                    task.wait(0.2)
+                    if not _G_AutoRollBall then break end
+
+                    -- 3. Tìm và click nút "Chọn" số 2
+                    local playerGui = Player:WaitForChild("PlayerGui")
+                    local chonButtons = {}
+
+                    for _, v in pairs(playerGui:GetDescendants()) do
+                        if v:IsA("TextButton") or v:IsA("ImageButton") then
+                            if v:IsA("TextButton") and string.find(string.lower(v.Text), "chọn") then
+                                table.insert(chonButtons, v)
+                            end
+                        end
+                    end
+
+                    table.sort(chonButtons, function(a, b)
+                        return a.AbsolutePosition.X < b.AbsolutePosition.X
+                    end)
+
+                    if #chonButtons >= 2 then
+                        triggerClick(chonButtons[2])
+                    end
+
+                    -- 4. Chờ 0.5s và SPAM nút "Cổ vũ" trong 20s
+                    task.wait(0.5)
+
+                    local startTime = tick()
+                    local duration = 20
+
+                    while (tick() - startTime < duration) and _G_AutoRollBall do
+                        local coVuBtn = nil
+                        for _, v in pairs(playerGui:GetDescendants()) do
+                            if v:IsA("TextButton") and string.find(string.lower(v.Text), "cổ vũ") then
+                                coVuBtn = v
+                                break
+                            end
+                        end
+                        
+                        if coVuBtn then
+                            triggerClick(coVuBtn)
+                        end
+                        
+                        task.wait(0.07)
+                    end
+
+                    if not _G_AutoRollBall then break end
+
+                    -- 5. Click vào giữa màn hình
+                    ClickCenterScreen()
+
+                    task.wait(1) -- Chờ trước khi lặp lại vòng mới
+                end
+            end)
+        else
+            Rayfield:Notify({Title = "⏹️", Content = "Đã TẮT lăn bóng!", Duration = 2})
         end
     end
 })
@@ -422,7 +564,7 @@ ContractTab:CreateButton({
     Name = "Đồng ý hợp đồng",
     Callback = function()
         AcceptContract()
-        Rayfield:Notify({Title = "📜", Content = "Đã gửi lệnh đồng ý hợp đồng!", Duration = 2})
+        Rayfield:Notify({Title = "📜", Content = "Đã đồng ý hợp đồng!", Duration = 2})
     end,
 })
 
@@ -438,7 +580,7 @@ ContractTab:CreateToggle({
         end
 
         if _G_AutoOffer then
-            Rayfield:Notify({Title = "📜", Content = "Đã BẬT tự động đồng ý hợp đồng (5s/lần)!", Duration = 2})
+            Rayfield:Notify({Title = "📜", Content = "Đã BẬT tự động đồng ý hợp đồng!", Duration = 2})
             Threads.Offer = task.spawn(function()
                 while _G_AutoOffer do
                     AcceptContract()
@@ -446,21 +588,21 @@ ContractTab:CreateToggle({
                 end
             end)
         else
-            Rayfield:Notify({Title = "⏹️", Content = "Đã TẮT tự động đồng ý hợp đồng!", Duration = 2})
+            Rayfield:Notify({Title = "⏹️", Content = "Đã TẮT tự động đồng ý!", Duration = 2})
         end
     end
 })
 
 ContractTab:CreateButton({
-    Name = "thêm tiền hợp đồng",
+    Name = "Thêm tiền hợp đồng",
     Callback = function()
         RaiseContract()
-        Rayfield:Notify({Title = "💵", Content = "Đã gửi lệnh kêu thêm tiền hợp đồng!", Duration = 2})
+        Rayfield:Notify({Title = "💵", Content = "Đã yêu cầu tăng tiền!", Duration = 2})
     end,
 })
 
 ContractTab:CreateToggle({
-    Name = "tự động kêu thêm tiền",
+    Name = "Tự động kêu thêm tiền",
     CurrentValue = false,
     Flag = "ToggleAutoRaiseOffer",
     Callback = function(Value)
@@ -471,7 +613,7 @@ ContractTab:CreateToggle({
         end
 
         if _G_AutoRaiseOffer then
-            Rayfield:Notify({Title = "💵", Content = "Đã BẬT tự động kêu thêm tiền (5s/lần)!", Duration = 2})
+            Rayfield:Notify({Title = "💵", Content = "Đã BẬT tự động tăng tiền!", Duration = 2})
             Threads.RaiseOffer = task.spawn(function()
                 while _G_AutoRaiseOffer do
                     RaiseContract()
@@ -479,21 +621,21 @@ ContractTab:CreateToggle({
                 end
             end)
         else
-            Rayfield:Notify({Title = "⏹️", Content = "Đã TẮT tự động kêu thêm tiền!", Duration = 2})
+            Rayfield:Notify({Title = "⏹️", Content = "Đã TẮT!", Duration = 2})
         end
     end
 })
 
 ContractTab:CreateButton({
-    Name = "từ chối hợp đồng",
+    Name = "Từ chối hợp đồng",
     Callback = function()
         RejectContract()
-        Rayfield:Notify({Title = "❌", Content = "Đã gửi lệnh từ chối hợp đồng!", Duration = 2})
+        Rayfield:Notify({Title = "❌", Content = "Đã từ chối hợp đồng!", Duration = 2})
     end,
 })
 
 ContractTab:CreateToggle({
-    Name = "tự động từ chối",
+    Name = "Tự động từ chối",
     CurrentValue = false,
     Flag = "ToggleAutoRejectOffer",
     Callback = function(Value)
@@ -504,7 +646,7 @@ ContractTab:CreateToggle({
         end
 
         if _G_AutoRejectOffer then
-            Rayfield:Notify({Title = "❌", Content = "Đã BẬT tự động từ chối hợp đồng (5s/lần)!", Duration = 2})
+            Rayfield:Notify({Title = "❌", Content = "Đã BẬT tự động từ chối!", Duration = 2})
             Threads.RejectOffer = task.spawn(function()
                 while _G_AutoRejectOffer do
                     RejectContract()
@@ -512,7 +654,7 @@ ContractTab:CreateToggle({
                 end
             end)
         else
-            Rayfield:Notify({Title = "⏹️", Content = "Đã TẮT tự động từ chối hợp đồng!", Duration = 2})
+            Rayfield:Notify({Title = "⏹️", Content = "Đã TẮT!", Duration = 2})
         end
     end
 })
@@ -523,7 +665,7 @@ ContractTab:CreateToggle({
 local RebirthTab = Window:CreateTab("Tái Sinh", 4483362458)
 
 RebirthTab:CreateButton({
-    Name = "Tái sinh",
+    Name = "Tái sinh ngay",
     Callback = function()
         DoRebirth()
         Rayfield:Notify({Title = "🔄", Content = "Đã thực hiện tái sinh!", Duration = 2})
@@ -554,23 +696,21 @@ RebirthTab:CreateToggle({
         end
 
         if _G_AutoRebirth then
-            Rayfield:Notify({Title = "🔄", Content = "Đã BẬT tự động tái sinh sau mỗi " .. RebirthDelay .. " phút!", Duration = 3})
+            Rayfield:Notify({Title = "🔄", Content = "Đã BẬT tự động tái sinh sau " .. RebirthDelay .. " phút!", Duration = 3})
             Threads.Rebirth = task.spawn(function()
                 while _G_AutoRebirth do
                     local totalWaitSeconds = RebirthDelay * 60
-                    
                     for i = 1, totalWaitSeconds do
                         if not _G_AutoRebirth then break end
                         task.wait(1)
                     end
-
                     if _G_AutoRebirth then
                         DoRebirth()
                     end
                 end
             end)
         else
-            Rayfield:Notify({Title = "⏹️", Content = "Đã TẮT tự động tái sinh!", Duration = 2})
+            Rayfield:Notify({Title = "⏹️", Content = "Đã TẮT tái sinh tự động!", Duration = 2})
         end
     end
 })
@@ -696,7 +836,7 @@ ClickTab:CreateToggle({
 })
 
 ClickTab:CreateToggle({
-    Name = "click lemonrobot",
+    Name = "Auto Click LemonRobotics",
     CurrentValue = false,
     Flag = "ToggleClickLemonRobotics",
     Callback = function(Value)
@@ -717,4 +857,4 @@ ClickTab:CreateToggle({
     end
 })
 
-Rayfield:Notify({Title = "🍋", Content = "🍋menu bán chanh🍋 v3.257 đã tải xong!", Duration = 3})
+Rayfield:Notify({Title = "🍋", Content = "🍋menu bán chanh🍋 v3.258 đã sẵn sàng!", Duration = 3})
