@@ -3,7 +3,7 @@ local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 -- [[ CỬA SỔ CHÍNH ]]
 local Window = Rayfield:CreateWindow({
-   Name = "🍋menu bán chanh🍋 v3.255 (Fixed Build)",
+   Name = "🍋menu bán chanh🍋 v3.257 (Added Lemon Robotics)",
    Icon = 0,
    LoadingTitle = "Đang tải...",
    LoadingSubtitle = "by Assistant",
@@ -32,6 +32,7 @@ local _G_AutoRedeem = false
 local _G_AutoClickLemonStand = false
 local _G_AutoClickLemonDash = false
 local _G_AutoClickLemonLabs = false
+local _G_AutoClickLemonRobotics = false
 local _G_AutoBuild = false
 local _G_AutoRebirth = false
 local _G_AutoOffer = false
@@ -49,6 +50,7 @@ local Threads = {
     LemonStand = nil,
     LemonDash = nil,
     LemonLabs = nil,
+    LemonRobotics = nil,
     Rebirth = nil,
     Offer = nil,
     RaiseOffer = nil,
@@ -97,22 +99,45 @@ local function getMyTycoon()
 end
 
 -- ============================
--- HÀM THỰC HIỆN NÂNG CẤP
+-- HÀM THỰC HIỆN NÂNG CẤP (ĐÃ SỬA LỖI TẮT KHÔNG DỪNG)
 -- ============================
 local function DoUpgrade(amount)
+    if not _G_AutoUpgrade then return end
     local tycoon = getMyTycoon() or Workspace:FindFirstChild("Tycoon2")
     if not tycoon then return end
 
+    -- 1. Nâng cấp Lemon Robotics
+    local robotUpgrade = nil
+    pcall(function()
+        robotUpgrade = tycoon:FindFirstChild("Purchases")
+            :FindFirstChild("Lemon Robotics")
+            :FindFirstChild("Lemon Robotics")
+            :FindFirstChild("Lemon Robotics")
+            :FindFirstChild("Upgrade")
+    end)
+
+    if robotUpgrade and robotUpgrade:IsA("RemoteFunction") then
+        for i = 1, amount do
+            if not _G_AutoUpgrade then return end
+            pcall(function()
+                robotUpgrade:InvokeServer(1)
+            end)
+        end
+    end
+
+    -- 2. Quét toàn bộ các hạng mục nâng cấp khác trong Tycoon
     local purchases = tycoon:FindFirstChild("Purchases")
     if purchases then
         for _, item in pairs(purchases:GetChildren()) do
+            if not _G_AutoUpgrade then return end
             local upgradeRemote = item:FindFirstChild("Upgrade", true)
             if upgradeRemote and upgradeRemote:IsA("RemoteFunction") then
-                coroutine.wrap(function()
+                for i = 1, amount do
+                    if not _G_AutoUpgrade then return end
                     pcall(function()
-                        upgradeRemote:InvokeServer(amount)
+                        upgradeRemote:InvokeServer(1)
                     end)
-                end)()
+                end
             end
         end
     end
@@ -258,15 +283,22 @@ local function CollectMoneyOnce()
 end
 
 local function ClickIncomeStream(itemName)
-    for _, v in pairs(Workspace:GetDescendants()) do
-        if (v:IsA("RemoteFunction") or v:IsA("RemoteEvent")) and v.Name == "WakeIncomeStream" then
-            pcall(function()
-                if v:IsA("RemoteFunction") then
-                    v:InvokeServer(itemName)
-                else
-                    v:FireServer(itemName)
-                end
-            end)
+    local myTycoon = getMyTycoon() or Workspace:FindFirstChild("Tycoon2")
+    if myTycoon and myTycoon:FindFirstChild("Remotes") and myTycoon.Remotes:FindFirstChild("WakeIncomeStream") then
+        pcall(function()
+            myTycoon.Remotes.WakeIncomeStream:InvokeServer(itemName)
+        end)
+    else
+        for _, v in pairs(Workspace:GetDescendants()) do
+            if (v:IsA("RemoteFunction") or v:IsA("RemoteEvent")) and v.Name == "WakeIncomeStream" then
+                pcall(function()
+                    if v:IsA("RemoteFunction") then
+                        v:InvokeServer(itemName)
+                    else
+                        v:FireServer(itemName)
+                    end
+                end)
+            end
         end
     end
 end
@@ -275,6 +307,12 @@ end
 -- TAB FARM
 -- ============================
 local FarmTab = Window:CreateTab("Farm", 4483362458)
+
+-- THÊM LƯU Ý THEO YÊU CẦU
+FarmTab:CreateParagraph({
+    Title = "⚠️ LƯU Ý QUAN TRỌNG",
+    Content = "Khuyến cáo: KHÔNG ĐƯỢC BẬT 2 TÍNH NĂNG CÙNG 1 LÚC TRONG TAB FARM! Hãy tắt tính năng đang chạy trước khi bật tính năng mới để tránh xung đột dữ liệu."
+})
 
 FarmTab:CreateParagraph({
     Title = "⚡ Nâng cấp Cực Nhanh",
@@ -297,7 +335,7 @@ FarmTab:CreateToggle({
             Threads.Upgrade = task.spawn(function()
                 while _G_AutoUpgrade do
                     DoUpgrade(UpgradeAmount)
-                    task.wait(0.1)
+                    task.wait(0.05)
                 end
             end)
         else
@@ -356,13 +394,13 @@ FarmTab:CreateToggle({
                             if not _G_AutoBuild then break end
 
                             if obj:IsA("RemoteFunction") and (obj.Name == "Purchase" or obj.Name == "PurchaseBuyEffect") then
-                                coroutine.wrap(function()
+                                task.spawn(function()
                                     pcall(function() obj:InvokeServer(false, false) end)
-                                end)()
+                                end)
                             elseif obj:IsA("RemoteEvent") and (obj.Name == "Purchase" or obj.Name == "PurchaseBuyEffect") then
-                                coroutine.wrap(function()
+                                task.spawn(function()
                                     pcall(function() obj:FireServer(false, false) end)
-                                end)()
+                                end)
                             end
                         end
                     end
@@ -380,7 +418,6 @@ FarmTab:CreateToggle({
 -- ============================
 local ContractTab = Window:CreateTab("Hợp Đồng", 4483362458)
 
--- 1. ĐỒNG Ý
 ContractTab:CreateButton({
     Name = "Đồng ý hợp đồng",
     Callback = function()
@@ -414,7 +451,6 @@ ContractTab:CreateToggle({
     end
 })
 
--- 2. KÊU THÊM TIỀN
 ContractTab:CreateButton({
     Name = "thêm tiền hợp đồng",
     Callback = function()
@@ -448,7 +484,6 @@ ContractTab:CreateToggle({
     end
 })
 
--- 3. TỪ CHỐI
 ContractTab:CreateButton({
     Name = "từ chối hợp đồng",
     Callback = function()
@@ -660,4 +695,26 @@ ClickTab:CreateToggle({
     end
 })
 
-Rayfield:Notify({Title = "🍋", Content = "🍋menu bán chanh🍋 v3.255 đã tải xong!", Duration = 3})
+ClickTab:CreateToggle({
+    Name = "click lemonrobot",
+    CurrentValue = false,
+    Flag = "ToggleClickLemonRobotics",
+    Callback = function(Value)
+        _G_AutoClickLemonRobotics = Value
+        if Threads.LemonRobotics then
+            task.cancel(Threads.LemonRobotics)
+            Threads.LemonRobotics = nil
+        end
+
+        if _G_AutoClickLemonRobotics then
+            Threads.LemonRobotics = task.spawn(function()
+                while _G_AutoClickLemonRobotics do
+                    ClickIncomeStream("LemonRobotics")
+                    task.wait(0.05)
+                end
+            end)
+        end
+    end
+})
+
+Rayfield:Notify({Title = "🍋", Content = "🍋menu bán chanh🍋 v3.257 đã tải xong!", Duration = 3})
