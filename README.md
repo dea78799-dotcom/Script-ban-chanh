@@ -3,7 +3,7 @@ local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 -- [[ CỬA SỔ CHÍNH ]]
 local Window = Rayfield:CreateWindow({
-   Name = "🍋menu bán chanh🍋 v3.270 (Pet Added)",
+   Name = "🍋menu bán chanh🍋 v3.290 (Shop Added)",
    Icon = 0,
    LoadingTitle = "Đang tải...",
    LoadingSubtitle = "by Assistant",
@@ -35,6 +35,7 @@ local _G_AutoClickLemonStand = false
 local _G_AutoClickLemonDash = false
 local _G_AutoClickLemonLabs = false
 local _G_AutoClickLemonRobotics = false
+local _G_AutoClickLemonRepublic = false
 local _G_AutoBuild = false
 local _G_AutoRebirth = false
 local _G_AutoEvolve = false
@@ -55,6 +56,7 @@ local Threads = {
     LemonDash = nil,
     LemonLabs = nil,
     LemonRobotics = nil,
+    LemonRepublic = nil,
     Rebirth = nil,
     Evolve = nil,
     Offer = nil,
@@ -132,6 +134,32 @@ local function getMyTycoon()
 end
 
 -- ============================
+-- HÀM TỰ ĐỘNG MUA POWER LEVEL
+-- ============================
+local function UpgradePower(powerType, amount)
+    amount = amount or 1
+    local myTycoon = getMyTycoon() or Workspace:FindFirstChild("Tycoon9")
+    if myTycoon then
+        local remotes = myTycoon:FindFirstChild("Remotes")
+        if remotes then
+            local event = remotes:FindFirstChild("UpgradePowerLevel")
+            if event and event:IsA("RemoteFunction") then
+                local success, err = pcall(function()
+                    event:InvokeServer(powerType, amount)
+                end)
+                if success then
+                    Rayfield:Notify({Title = "🛒 Mua thành công", Content = "Đã nâng cấp: " .. powerType .. " (" .. myTycoon.Name .. ")", Duration = 2.5})
+                else
+                    Rayfield:Notify({Title = "⚠️ Thất bại", Content = "Lỗi khi gọi Remote!", Duration = 2.5})
+                end
+                return
+            end
+        end
+    end
+    Rayfield:Notify({Title = "⚠️ Lỗi", Content = "Không tìm thấy Remote UpgradePowerLevel trên Tycoon!", Duration = 3})
+end
+
+-- ============================
 -- HÀM DỊCH CHUYỂN BẰNG CFRAME
 -- ============================
 local function teleportCFrame(cframe)
@@ -168,6 +196,30 @@ local function DoUpgrade(amount)
     if not _G_AutoUpgrade then return end
     local tycoon = getMyTycoon() or Workspace:FindFirstChild("Tycoon2")
     if not tycoon then return end
+
+    pcall(function()
+        local purchases = tycoon:FindFirstChild("Purchases")
+        if purchases then
+            local lr1 = purchases:FindFirstChild("Lemon Republic")
+            if lr1 then
+                local lr2 = lr1:FindFirstChild("Lemon Republic")
+                if lr2 then
+                    local lr3 = lr2:FindFirstChild("Lemon Republic")
+                    if lr3 then
+                        local upgradeRemote = lr3:FindFirstChild("Upgrade")
+                        if upgradeRemote and upgradeRemote:IsA("RemoteFunction") then
+                            task.spawn(function()
+                                for i = 1, amount do
+                                    if not _G_AutoUpgrade then break end
+                                    pcall(function() upgradeRemote:InvokeServer(1) end)
+                                end
+                            end)
+                        end
+                    end
+                end
+            end
+        end
+    end)
 
     local purchases = tycoon:FindFirstChild("Purchases")
     if not purchases then return end
@@ -386,6 +438,44 @@ local function ClickIncomeStream(itemName)
         end
     end
 end
+
+-- ============================
+-- TAB SHOP (MUA ĐỒ)
+-- ============================
+local ShopTab = Window:CreateTab("Mua đồ", 4483362458)
+
+ShopTab:CreateParagraph({
+    Title = "🛒 Cửa hàng Tycoon",
+    Content = "Tự động xác định Tycoon của bạn và thực hiện các nâng cấp PowerLevel."
+})
+
+ShopTab:CreateButton({
+    Name = "mua quản lí",
+    Callback = function()
+        UpgradePower("Manage", 1)
+    end,
+})
+
+ShopTab:CreateButton({
+    Name = "mua thêm speed",
+    Callback = function()
+        UpgradePower("WalkSpeed", 1)
+    end,
+})
+
+ShopTab:CreateButton({
+    Name = "mua nâng cấp nhiều hơn",
+    Callback = function()
+        UpgradePower("UpgradeStack", 1)
+    end,
+})
+
+ShopTab:CreateButton({
+    Name = "lụm trái thêm tiền",
+    Callback = function()
+        UpgradePower("ClickFruitValue", 1)
+    end,
+})
 
 -- ============================
 -- TAB FARM
@@ -979,6 +1069,28 @@ ClickTab:CreateToggle({
     end
 })
 
+ClickTab:CreateToggle({
+    Name = "Auto click cộng hòa",
+    CurrentValue = false,
+    Flag = "ToggleClickLemonRepublic",
+    Callback = function(Value)
+        _G_AutoClickLemonRepublic = Value
+        if Threads.LemonRepublic then
+            task.cancel(Threads.LemonRepublic)
+            Threads.LemonRepublic = nil
+        end
+
+        if _G_AutoClickLemonRepublic then
+            Threads.LemonRepublic = task.spawn(function()
+                while _G_AutoClickLemonRepublic do
+                    ClickIncomeStream("LemonRepublic")
+                    task.wait(0.05)
+                end
+            end)
+        end
+    end
+})
+
 -- ============================
 -- TAB PET
 -- ============================
@@ -996,4 +1108,4 @@ PetTab:CreateButton({
     end,
 })
 
-Rayfield:Notify({Title = "🍋", Content = "🍋menu bán chanh🍋 v3.270 đã sẵn sàng!", Duration = 3})
+Rayfield:Notify({Title = "🍋", Content = "🍋menu bán chanh🍋 v3.290 đã sẵn sàng!", Duration = 3})
