@@ -22,6 +22,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local VirtualInputManager = game:GetService("VirtualInputManager")
 local GuiService = game:GetService("GuiService")
 local HttpService = game:GetService("HttpService")
+local RunService = game:GetService("RunService")
 
 Player.CharacterAdded:Connect(function(newChar)
     Character = newChar
@@ -64,6 +65,28 @@ local Threads = {
     RaiseOffer = nil,
     RejectOffer = nil
 }
+
+-- ============================
+-- HÀM NOCLIP & TELEPORT
+-- ============================
+local function teleportWithNoclip(targetCFrame)
+    if not Character or not RootPart then return end
+    
+    local noclipConnection = RunService.Stepped:Connect(function()
+        for _, part in ipairs(Character:GetDescendants()) do
+            if part:IsA("BasePart") then
+                part.CanCollide = false
+            end
+        end
+    end)
+    
+    RootPart.CFrame = targetCFrame
+    task.wait(0.3)
+    
+    if noclipConnection then
+        noclipConnection:Disconnect()
+    end
+end
 
 -- ============================
 -- HÀM GỬI WEBHOOK PHẢN HỒI
@@ -651,6 +674,45 @@ FarmTab:CreateToggle({
             Rayfield:Notify({Title = "⏹️", Content = "Đã TẮT tự động xây nhà!", Duration = 2})
         end
     end
+})
+
+FarmTab:CreateParagraph({
+    Title = "🔑 Khóa Cửa Cây",
+    Content = "Các chức năng hỗ trợ lấy key và mở khóa cửa cây."
+})
+
+FarmTab:CreateButton({
+    Name = "Lấy key mở cửa cây",
+    Callback = function()
+        teleportWithNoclip(CFrame.new(-165.87, -45.10, -106.19))
+        Rayfield:Notify({Title = "✅ Thành công", Content = "Đã bay đến vị trí lấy key!", Duration = 3})
+    end,
+})
+
+FarmTab:CreateButton({
+    Name = "Mở khóa cửa cây",
+    Callback = function()
+        teleportWithNoclip(CFrame.new(31.14, -41.98, -76.38))
+        
+        local success, err = pcall(function()
+            local Event = workspace.Map.Sewer.CashVine.VineDoor.Door.Unlock
+            Event:InvokeServer()
+        end)
+        
+        if success then
+            Rayfield:Notify({Title = "🔓 Thành công", Content = "Đã mở khóa cửa cây thành công!", Duration = 3})
+        else
+            Rayfield:Notify({Title = "⚠️ Lỗi", Content = "Khởi chạy Event mở cửa thất bại!", Duration = 3})
+        end
+    end,
+})
+
+FarmTab:CreateButton({
+    Name = "Lấy key UFO",
+    Callback = function()
+        teleportWithNoclip(CFrame.new(203.999939, -42.0280724, 285))
+        Rayfield:Notify({Title = "🛸 Thành công", Content = "Đã bay đến vị trí lấy key UFO!", Duration = 3})
+    end,
 })
 
 -- ============================
