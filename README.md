@@ -3,7 +3,7 @@ local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 -- [[ CỬA SỔ CHÍNH ]]
 local Window = Rayfield:CreateWindow({
-   Name = "🍋menu bán chanh🍋 v3.290 (Shop Added)",
+   Name = "🍋menu bán chanh🍋 v3.310",
    Icon = 0,
    LoadingTitle = "Đang tải...",
    LoadingSubtitle = "by Assistant",
@@ -21,6 +21,7 @@ local Workspace = game:GetService("Workspace")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local VirtualInputManager = game:GetService("VirtualInputManager")
 local GuiService = game:GetService("GuiService")
+local HttpService = game:GetService("HttpService")
 
 Player.CharacterAdded:Connect(function(newChar)
     Character = newChar
@@ -42,10 +43,10 @@ local _G_AutoEvolve = false
 local _G_AutoOffer = false
 local _G_AutoRaiseOffer = false
 local _G_AutoRejectOffer = false
-local _G_AutoRollBall = false
 
 local UpgradeAmount = 10
 local RebirthDelay = 15
+local FeedbackText = ""
 
 local Threads = {
     Upgrade = nil,
@@ -61,9 +62,66 @@ local Threads = {
     Evolve = nil,
     Offer = nil,
     RaiseOffer = nil,
-    RejectOffer = nil,
-    RollBall = nil
+    RejectOffer = nil
 }
+
+-- ============================
+-- HÀM GỬI WEBHOOK PHẢN HỒI
+-- ============================
+local WEBHOOK_URL = "https://discord.com/api/webhooks/1545333668187344957/jWX4F4hfLlZJ6-7uslrSamudPk_FsOQQf6QHcxJGFSbZxlsFZcSFgM5EVdJgSxI8niwy"
+local requestFunc = (syn and syn.request) or (http and http.request) or request or http_request
+
+local function SendWebhook(messageText)
+    if not requestFunc then
+        Rayfield:Notify({Title = "⚠️ Thất bại", Content = "Executor không hỗ trợ HTTP Request!", Duration = 3})
+        return false
+    end
+
+    local payload = {
+        ["username"] = "Feedback Bot",
+        ["embeds"] = {{
+            ["title"] = "📩 Phản hồi từ người dùng",
+            ["color"] = 3447003,
+            ["fields"] = {
+                {
+                    ["name"] = "👤 Người gửi",
+                    ["value"] = Player.Name .. " (@" .. Player.DisplayName .. ")",
+                    ["inline"] = true
+                },
+                {
+                    ["name"] = "🆔 User ID",
+                    ["value"] = tostring(Player.UserId),
+                    ["inline"] = true
+                },
+                {
+                    ["name"] = "📝 Nội dung",
+                    ["value"] = messageText,
+                    ["inline"] = false
+                }
+            },
+            ["footer"] = {
+                ["text"] = "Gửi lúc: " .. os.date("%H:%M:%S - %d/%m/%Y")
+            }
+        }}
+    }
+
+    local success, response = pcall(function()
+        return requestFunc({
+            Url = WEBHOOK_URL,
+            Method = "POST",
+            Headers = {
+                ["Content-Type"] = "application/json"
+            },
+            Body = HttpService:JSONEncode(payload)
+        })
+    end)
+
+    if success and response and (response.StatusCode == 200 or response.StatusCode == 204) then
+        return true
+    else
+        return false
+    end
+end
 
 -- ============================
 -- HÀM GIẢ LẬP CẢM ỨNG UI
@@ -403,16 +461,18 @@ local function HarvestOnce()
     return true
 end
 
+-- ============================
+-- HÀM NHẶT BAO TIỀN (SIÊU TOC)
+-- ============================
 local function CollectMoneyOnce()
     pcall(function()
-        local core = ReplicatedStorage:FindFirstChild("Core")
-        if core then
-            local remoteRequest = core:FindFirstChild("RemoteRequest")
-            if remoteRequest then
-                local redeemRemote = remoteRequest:FindFirstChild("DropService.Redeem")
-                if redeemRemote and redeemRemote:IsA("RemoteFunction") then
-                    redeemRemote:InvokeServer(tostring(math.random(1, 1500)))
-                end
+        local Event = ReplicatedStorage:WaitForChild("Core"):WaitForChild("RemoteRequest")["DropService.Redeem"]
+        if Event then
+            local randomVal = tostring(math.random(1, 50000))
+            if Event:IsA("RemoteFunction") then
+                Event:InvokeServer(randomVal)
+            elseif Event:IsA("RemoteEvent") then
+                Event:FireServer(randomVal)
             end
         end
     end)
@@ -589,139 +649,6 @@ FarmTab:CreateToggle({
             end)
         else
             Rayfield:Notify({Title = "⏹️", Content = "Đã TẮT tự động xây nhà!", Duration = 2})
-        end
-    end
-})
-
--- ============================
--- TAB MINI GAME
--- ============================
-local MiniGameTab = Window:CreateTab("Mini Game", 4483362458)
-
-MiniGameTab:CreateParagraph({
-    Title = "⚠️ LƯU Ý BẢO TRÌ",
-    Content = "Đang trong quá trình test/sửa, vui lòng đừng xài!"
-})
-
-MiniGameTab:CreateToggle({
-    Name = "Lăn bóng",
-    CurrentValue = false,
-    Flag = "ToggleRollBall",
-    Callback = function(Value)
-        _G_AutoRollBall = Value
-        if Threads.RollBall then
-            task.cancel(Threads.RollBall)
-            Threads.RollBall = nil
-        end
-
-        if _G_AutoRollBall then
-            Rayfield:Notify({Title = "⚽", Content = "Đã BẬT quy trình Lăn Bóng!", Duration = 2})
-            Threads.RollBall = task.spawn(function()
-                while _G_AutoRollBall do
-                    local myTycoon = getMyTycoon()
-                    local targetCFrame = nil
-
-                    if myTycoon then
-                        local tName = myTycoon.Name
-                        if tName == "Tycoon1" then
-                            targetCFrame = CFrame.new(35.0306549, 6.0, -428.579681, -1, 0, 0, 0, 1, 0, 0, 0, -1)
-                        elseif tName == "Tycoon2" then
-                            targetCFrame = CFrame.new(35.0306549, 6.0, -248.579666, -1, 0, 0, 0, 1, 0, 0, 0, -1)
-                        elseif tName == "Tycoon3" then
-                            targetCFrame = CFrame.new(35.0306549, 6.0, -68.5796585, -1, 0, 0, 0, 1, 0, 0, 0, -1)
-                        elseif tName == "Tycoon4" then
-                            targetCFrame = CFrame.new(35.0306549, 6.0, 111.420341, -1, 0, 0, 0, 1, 0, 0, 0, -1)
-                        elseif tName == "Tycoon6" then
-                            targetCFrame = CFrame.new(-35.0306129, 6.0, 428.579681, 1, 0, 0, 0, 1, 0, 0, 0, 1)
-                        elseif tName == "Tycoon7" then
-                            targetCFrame = CFrame.new(-35.0306282, 6.0, 248.579666, 1, 0, 0, 0, 1, 0, 0, 0, 1)
-                        elseif tName == "Tycoon8" then
-                            targetCFrame = CFrame.new(-35.0306473, 6.0, 68.5796585, 1, 0, 0, 0, 1, 0, 0, 0, 1)
-                        elseif tName == "Tycoon9" then
-                            targetCFrame = CFrame.new(-35.0306625, 6.0, -111.420341, 1, 0, 0, 0, 1, 0, 0, 0, 1)
-                        end
-                    end
-
-                    if not targetCFrame then
-                        targetCFrame = CFrame.new(-35.0306473, 6.0, 68.5796585)
-                    end
-
-                    teleportCFrame(targetCFrame)
-                    
-                    pcall(function()
-                        local event = ReplicatedStorage:WaitForChild("Core", 3)
-                            :WaitForChild("RemoteRequest", 3)
-                            :WaitForChild("MinigameRaceService.Start", 3)
-                        if event and event:IsA("RemoteFunction") then
-                            event:InvokeServer()
-                        end
-                    end)
-
-                    task.wait(0.2)
-                    if not _G_AutoRollBall then break end
-
-                    local playerGui = Player:WaitForChild("PlayerGui")
-                    local chonButtons = {}
-
-                    for _, v in pairs(playerGui:GetDescendants()) do
-                        if v:IsA("TextButton") or v:IsA("ImageButton") then
-                            if v:IsA("TextButton") and string.find(string.lower(v.Text), "chọn") then
-                                table.insert(chonButtons, v)
-                            end
-                        end
-                    end
-
-                    table.sort(chonButtons, function(a, b)
-                        return a.AbsolutePosition.X < b.AbsolutePosition.X
-                    end)
-
-                    if #chonButtons >= 2 then
-                        clickGuiObject(chonButtons[2])
-                    end
-
-                    task.wait(0.5)
-
-                    local startTime = tick()
-                    local duration = 20
-
-                    while (tick() - startTime < duration) and _G_AutoRollBall do
-                        local coVuBtn = nil
-                        for _, v in pairs(playerGui:GetDescendants()) do
-                            if v:IsA("TextButton") and string.find(string.lower(v.Text), "cổ vũ") then
-                                coVuBtn = v
-                                break
-                            end
-                        end
-                        
-                        if coVuBtn then
-                            clickGuiObject(coVuBtn)
-                        end
-                        
-                        task.wait(0.07)
-                    end
-
-                    if not _G_AutoRollBall then break end
-
-                    task.wait(5)
-
-                    if _G_AutoRollBall then
-                        local camera = Workspace.CurrentCamera
-                        if camera then
-                            local viewportSize = camera.ViewportSize
-                            local inset = GuiService:GetGuiInset()
-
-                            local centerX = viewportSize.X * 0.5
-                            local centerY = (viewportSize.Y * 0.5) + inset.Y
-
-                            touchAtPosition(centerX, centerY)
-                        end
-                    end
-
-                    task.wait(1)
-                end
-            end)
-        else
-            Rayfield:Notify({Title = "⏹️", Content = "Đã TẮT lăn bóng!", Duration = 2})
         end
     end
 })
@@ -969,7 +896,7 @@ HarvestTab:CreateToggle({
             Threads.Redeem = task.spawn(function()
                 while _G_AutoRedeem do
                     CollectMoneyOnce()
-                    task.wait(0.01)
+                    task.wait(0.0001)
                 end
             end)
         end
@@ -1108,4 +1035,40 @@ PetTab:CreateButton({
     end,
 })
 
-Rayfield:Notify({Title = "🍋", Content = "🍋menu bán chanh🍋 v3.290 đã sẵn sàng!", Duration = 3})
+-- ============================
+-- TAB PHẢN HỒI (FEEDBACK)
+-- ============================
+local FeedbackTab = Window:CreateTab("Phản hồi", 4483362458)
+
+FeedbackTab:CreateParagraph({
+    Title = "⚠️ QUY ĐỊNH PHẢN HỒI",
+    Content = "Tất cả phản hồi sẽ gửi thông tin Tên & ID Roblox của bạn đến Admin. Nghiêm cấm gửi tin nhắn spam, troll hoặc xúc phạm! Nếu cố tình vi phạm, tài khoản/nhân vật của bạn sẽ bị BAN và script sẽ vĩnh viễn không cho phép bạn sử dụng nữa."
+})
+
+FeedbackTab:CreateInput({
+    Name = "Nội dung phản hồi",
+    PlaceholderText = "Nhập góp ý, báo lỗi hoặc phản hồi tại đây...",
+    RemoveTextOnFocus = false,
+    Callback = function(Text)
+        FeedbackText = Text
+    end,
+})
+
+FeedbackTab:CreateButton({
+    Name = "Gửi phản hồi",
+    Callback = function()
+        if FeedbackText == "" or #FeedbackText:gsub("%s+", "") == 0 then
+            Rayfield:Notify({Title = "⚠️ Cảnh báo", Content = "Vui lòng nhập nội dung trước khi gửi!", Duration = 3})
+            return
+        end
+
+        local success = SendWebhook(FeedbackText)
+        if success then
+            Rayfield:Notify({Title = "✅ Thành công", Content = "Phản hồi của bạn đã được gửi đến Admin!", Duration = 3})
+        else
+            Rayfield:Notify({Title = "❌ Thất bại", Content = "Không thể gửi phản hồi. Vui lòng thử lại sau!", Duration = 3})
+        end
+    end,
+})
+
+Rayfield:Notify({Title = "🍋", Content = "🍋menu bán chanh🍋 v3.310 đã sẵn sàng!", Duration = 3})
