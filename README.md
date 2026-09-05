@@ -23,6 +23,8 @@ local VirtualInputManager = game:GetService("VirtualInputManager")
 local GuiService = game:GetService("GuiService")
 local HttpService = game:GetService("HttpService")
 local RunService = game:GetService("RunService")
+local TeleportService = game:GetService("TeleportService")
+local Lighting = game:GetService("Lighting")
 
 Player.CharacterAdded:Connect(function(newChar)
     Character = newChar
@@ -38,12 +40,14 @@ local _G_AutoClickLemonDash = false
 local _G_AutoClickLemonLabs = false
 local _G_AutoClickLemonRobotics = false
 local _G_AutoClickLemonRepublic = false
+local _G_AutoClickLemonX = false
 local _G_AutoBuild = false
 local _G_AutoRebirth = false
 local _G_AutoEvolve = false
 local _G_AutoOffer = false
 local _G_AutoRaiseOffer = false
 local _G_AutoRejectOffer = false
+local _G_AntiAFK = false
 
 local UpgradeAmount = 10
 local RebirthDelay = 15
@@ -59,11 +63,13 @@ local Threads = {
     LemonLabs = nil,
     LemonRobotics = nil,
     LemonRepublic = nil,
+    LemonX = nil,
     Rebirth = nil,
     Evolve = nil,
     Offer = nil,
     RaiseOffer = nil,
-    RejectOffer = nil
+    RejectOffer = nil,
+    AntiAFK = nil
 }
 
 -- ============================
@@ -281,6 +287,7 @@ local function DoUpgrade(amount)
     pcall(function()
         local purchases = tycoon:FindFirstChild("Purchases")
         if purchases then
+            -- Nâng cấp Lemon Republic
             local lr1 = purchases:FindFirstChild("Lemon Republic")
             if lr1 then
                 local lr2 = lr1:FindFirstChild("Lemon Republic")
@@ -293,6 +300,26 @@ local function DoUpgrade(amount)
                                 for i = 1, amount do
                                     if not _G_AutoUpgrade then break end
                                     pcall(function() upgradeRemote:InvokeServer(1) end)
+                                end
+                            end)
+                        end
+                    end
+                end
+            end
+
+            -- Nâng cấp LemonX
+            local lx1 = purchases:FindFirstChild("LemonX")
+            if lx1 then
+                local lx2 = lx1:FindFirstChild("LemonX")
+                if lx2 then
+                    local lx3 = lx2:FindFirstChild("LemonX")
+                    if lx3 then
+                        local upgradeRemoteX = lx3:FindFirstChild("Upgrade")
+                        if upgradeRemoteX and upgradeRemoteX:IsA("RemoteFunction") then
+                            task.spawn(function()
+                                for i = 1, amount do
+                                    if not _G_AutoUpgrade then break end
+                                    pcall(function() upgradeRemoteX:InvokeServer(1) end)
                                 end
                             end)
                         end
@@ -1080,6 +1107,28 @@ ClickTab:CreateToggle({
     end
 })
 
+ClickTab:CreateToggle({
+    Name = "tự động click lemonX",
+    CurrentValue = false,
+    Flag = "ToggleClickLemonX",
+    Callback = function(Value)
+        _G_AutoClickLemonX = Value
+        if Threads.LemonX then
+            task.cancel(Threads.LemonX)
+            Threads.LemonX = nil
+        end
+
+        if _G_AutoClickLemonX then
+            Threads.LemonX = task.spawn(function()
+                while _G_AutoClickLemonX do
+                    ClickIncomeStream("LemonX")
+                    task.wait(0.05)
+                end
+            end)
+        end
+    end
+})
+
 -- ============================
 -- TAB PET
 -- ============================
@@ -1098,9 +1147,84 @@ PetTab:CreateButton({
 })
 
 -- ============================
--- TAB PHẢN HỒI (FEEDBACK)
+-- TAB PHẢN HỒI (FEEDBACK & TOOLS)
 -- ============================
 local FeedbackTab = Window:CreateTab("Phản hồi", 4483362458)
+
+FeedbackTab:CreateParagraph({
+    Title = "🛡️ TÍNH NĂNG HỖ TRỢ HỆ THỐNG",
+    Content = "Các công cụ chống AFK, chống Kick (Auto Rejoin) và tối ưu giảm Lag."
+})
+
+-- ANTI AFK
+FeedbackTab:CreateToggle({
+    Name = "Anti AFK (Tránh bị kick 20p)",
+    CurrentValue = false,
+    Flag = "ToggleAntiAFK",
+    Callback = function(Value)
+        _G_AntiAFK = Value
+        if Threads.AntiAFK then
+            task.cancel(Threads.AntiAFK)
+            Threads.AntiAFK = nil
+        end
+
+        if _G_AntiAFK then
+            Rayfield:Notify({Title = "🛡️ Anti AFK", Content = "Đã BẬT chống treo máy 20 phút!", Duration = 3})
+            Threads.AntiAFK = task.spawn(function()
+                while _G_AntiAFK do
+                    pcall(function()
+                        VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.Unknown, false, game)
+                        task.wait(0.1)
+                        VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.Unknown, false, game)
+                    end)
+                    task.wait(60)
+                end
+            end)
+        else
+            Rayfield:Notify({Title = "⏹️ Anti AFK", Content = "Đã TẮT Anti AFK!", Duration = 2})
+        end
+    end
+})
+
+-- ANTI KICK / AUTO REJOIN
+FeedbackTab:CreateButton({
+    Name = "Bật Anti Kick (Auto Rejoin)",
+    Callback = function()
+        pcall(function()
+            GuiService.ErrorMessageChanged:Connect(function()
+                task.wait(1)
+                if #Players:GetPlayers() <= 1 then
+                    TeleportService:Teleport(game.PlaceId, Player)
+                else
+                    TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, Player)
+                end
+            end)
+        end)
+        Rayfield:Notify({Title = "🔄 Anti Kick", Content = "Đã bật tự động vào lại khi bị kick / mất kết nối!", Duration = 3})
+    end,
+})
+
+-- ANTI LAG / REDUCE LAG
+FeedbackTab:CreateButton({
+    Name = "Anti Lag (Tối ưu hóa game)",
+    Callback = function()
+        pcall(function()
+            Lighting.GlobalShadows = false
+            Lighting.FogEnd = 9e9
+            
+            for _, v in pairs(Workspace:GetDescendants()) do
+                if v:IsA("ParticleEmitter") or v:IsA("Trail") or v:IsA("Smoke") or v:IsA("Fire") or v:IsA("Sparkles") then
+                    v.Enabled = false
+                elseif v:IsA("PostEffect") then
+                    v.Enabled = false
+                end
+            end
+            
+            settings().Rendering.QualityLevel = 1
+        end)
+        Rayfield:Notify({Title = "⚡ Anti Lag", Content = "Đã dọn dẹp hiệu ứng & giảm lag thành công!", Duration = 3})
+    end,
+})
 
 FeedbackTab:CreateParagraph({
     Title = "⚠️ QUY ĐỊNH PHẢN HỒI",
