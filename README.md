@@ -41,6 +41,7 @@ local _G_AutoClickLemonLabs = false
 local _G_AutoClickLemonRobotics = false
 local _G_AutoClickLemonRepublic = false
 local _G_AutoClickLemonX = false
+local _G_AutoClickLemonTrading = false
 local _G_AutoBuild = false
 local _G_AutoRebirth = false
 local _G_AutoEvolve = false
@@ -64,6 +65,7 @@ local Threads = {
     LemonRobotics = nil,
     LemonRepublic = nil,
     LemonX = nil,
+    LemonTrading = nil,
     Rebirth = nil,
     Evolve = nil,
     Offer = nil,
@@ -529,7 +531,7 @@ local function CollectMoneyOnce()
 end
 
 local function ClickIncomeStream(itemName)
-    local myTycoon = getMyTycoon() or Workspace:FindFirstChild("Tycoon2")
+    local myTycoon = getMyTycoon() or Workspace:FindFirstChild("Tycoon7")
     if myTycoon and myTycoon:FindFirstChild("Remotes") and myTycoon.Remotes:FindFirstChild("WakeIncomeStream") then
         pcall(function()
             myTycoon.Remotes.WakeIncomeStream:InvokeServer(itemName)
@@ -1122,6 +1124,28 @@ ClickTab:CreateToggle({
             Threads.LemonX = task.spawn(function()
                 while _G_AutoClickLemonX do
                     ClickIncomeStream("LemonX")
+                    task.wait(0.05)
+                end
+            end)
+        end
+    end
+})
+
+ClickTab:CreateToggle({
+    Name = "Auto Click LemonTrading",
+    CurrentValue = false,
+    Flag = "ToggleClickLemonTrading",
+    Callback = function(Value)
+        _G_AutoClickLemonTrading = Value
+        if Threads.LemonTrading then
+            task.cancel(Threads.LemonTrading)
+            Threads.LemonTrading = nil
+        end
+
+        if _G_AutoClickLemonTrading then
+            Threads.LemonTrading = task.spawn(function()
+                while _G_AutoClickLemonTrading do
+                    ClickIncomeStream("LemonTrading")
                     task.wait(0.05)
                 end
             end)
