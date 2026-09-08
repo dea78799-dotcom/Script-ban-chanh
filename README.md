@@ -3,7 +3,7 @@ local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 -- [[ CỬA SỔ CHÍNH ]]
 local Window = Rayfield:CreateWindow({
-   Name = "🍋menu bán chanh🍋 v3.310",
+   Name = "🍋menu bán chanh🍋 v3.4 vip (đang sửa)",
    Icon = 0,
    LoadingTitle = "Đang tải...",
    LoadingSubtitle = "by Assistant",
@@ -43,6 +43,7 @@ local _G_AutoClickLemonRepublic = false
 local _G_AutoClickLemonX = false
 local _G_AutoClickLemonTrading = false
 local _G_AutoBuild = false
+local _G_AutoRemoteBuild = false
 local _G_AutoUnlockPlot = false
 local _G_AutoRebirth = false
 local _G_AutoEvolve = false
@@ -65,6 +66,7 @@ local FeedbackText = ""
 local Threads = {
     Upgrade = nil,
     Build = nil,
+    RemoteBuild = nil,
     UnlockPlot = nil,
     Harvest = nil,
     Redeem = nil,
@@ -259,7 +261,6 @@ local function UpgradePower(powerType, amount)
         end
     end
     
-    -- Fallback trực tiếp Tycoon1 nếu không tìm thấy Tycoon riêng
     pcall(function()
         local Event = Workspace.Tycoon1.Remotes.UpgradePowerLevel
         if Event:IsA("RemoteFunction") then
@@ -333,7 +334,6 @@ local function DoUpgrade(amount)
     pcall(function()
         local purchases = tycoon:FindFirstChild("Purchases")
         if purchases then
-            -- Nâng cấp Lemon Republic
             local lr1 = purchases:FindFirstChild("Lemon Republic")
             if lr1 then
                 local lr2 = lr1:FindFirstChild("Lemon Republic")
@@ -353,7 +353,6 @@ local function DoUpgrade(amount)
                 end
             end
 
-            -- Nâng cấp LemonX
             local lx1 = purchases:FindFirstChild("LemonX")
             if lx1 then
                 local lx2 = lx1:FindFirstChild("LemonX")
@@ -390,6 +389,33 @@ local function DoUpgrade(amount)
                     end)
                 end
             end)
+        end
+    end
+end
+
+-- ============================
+-- HÀM XÂY BẰNG MÁY MUA TỰ ĐỘNG TỪ XA
+-- ============================
+local function DoRemoteBuild()
+    local myTycoon = getMyTycoon() or Workspace:FindFirstChild("Tycoon7")
+    if not myTycoon then return end
+
+    local purchases = myTycoon:FindFirstChild("Purchases")
+    if not purchases then return end
+
+    for _, item in pairs(purchases:GetDescendants()) do
+        if not _G_AutoRemoteBuild then break end
+
+        if item.Name == "Purchase" then
+            if item:IsA("RemoteFunction") then
+                task.spawn(function()
+                    pcall(function() item:InvokeServer(true, false) end)
+                end)
+            elseif item:IsA("RemoteEvent") then
+                task.spawn(function()
+                    pcall(function() item:FireServer(true, false) end)
+                end)
+            end
         end
     end
 end
@@ -558,7 +584,7 @@ local function HarvestOnce()
 end
 
 -- ============================
--- HÀM NHẶT BAO TIỀN (SỬA LỖI)
+-- HÀM NHẶT BAO TIỀN
 -- ============================
 local function CollectMoneyOnce()
     pcall(function()
@@ -625,7 +651,6 @@ ShopTab:CreateParagraph({
     Content = "Mua đồ thủ công hoặc bật tự động mua liên tục."
 })
 
--- NÚT MUA MÁY NÂNG CẤP TỪ XA (BUY NEXT)
 ShopTab:CreateButton({
     Name = "mua máy nâng cấp từ xa",
     Callback = function()
@@ -865,6 +890,31 @@ FarmTab:CreateSlider({
 FarmTab:CreateParagraph({
     Title = "🏠 Tự động xây nhà",
     Content = "Mua các nút còn thiếu trong Tycoon."
+})
+
+FarmTab:CreateToggle({
+    Name = "xây bằng máy mua tự động từ xa",
+    CurrentValue = false,
+    Flag = "ToggleAutoRemoteBuild",
+    Callback = function(Value)
+        _G_AutoRemoteBuild = Value
+        if Threads.RemoteBuild then
+            task.cancel(Threads.RemoteBuild)
+            Threads.RemoteBuild = nil
+        end
+
+        if _G_AutoRemoteBuild then
+            Rayfield:Notify({Title = "🏗️", Content = "Đã BẬT xây bằng máy mua tự động từ xa!", Duration = 2})
+            Threads.RemoteBuild = task.spawn(function()
+                while _G_AutoRemoteBuild do
+                    DoRemoteBuild()
+                    task.wait(0.2)
+                end
+            end)
+        else
+            Rayfield:Notify({Title = "⏹️", Content = "Đã TẮT xây bằng máy từ xa!", Duration = 2})
+        end
+    end
 })
 
 FarmTab:CreateButton({
@@ -1498,4 +1548,4 @@ FeedbackTab:CreateButton({
     end,
 })
 
-Rayfield:Notify({Title = "🍋", Content = "🍋menu bán chanh🍋 v3.310 đã sẵn sàng!", Duration = 3})
+Rayfield:Notify({Title = "🍋", Content = "🍋menu bán chanh🍋 v3.4 vip (đang sửa) đã sẵn sàng!", Duration = 3})
