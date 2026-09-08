@@ -43,12 +43,20 @@ local _G_AutoClickLemonRepublic = false
 local _G_AutoClickLemonX = false
 local _G_AutoClickLemonTrading = false
 local _G_AutoBuild = false
+local _G_AutoUnlockPlot = false
 local _G_AutoRebirth = false
 local _G_AutoEvolve = false
 local _G_AutoOffer = false
 local _G_AutoRaiseOffer = false
 local _G_AutoRejectOffer = false
 local _G_AntiAFK = false
+
+-- AUTO BUY STATES
+local _G_AutoBuyNext = false
+local _G_AutoBuyManage = false
+local _G_AutoBuyWalkSpeed = false
+local _G_AutoBuyUpgradeStack = false
+local _G_AutoBuyClickFruitValue = false
 
 local UpgradeAmount = 10
 local RebirthDelay = 15
@@ -57,6 +65,7 @@ local FeedbackText = ""
 local Threads = {
     Upgrade = nil,
     Build = nil,
+    UnlockPlot = nil,
     Harvest = nil,
     Redeem = nil,
     LemonStand = nil,
@@ -71,7 +80,12 @@ local Threads = {
     Offer = nil,
     RaiseOffer = nil,
     RejectOffer = nil,
-    AntiAFK = nil
+    AntiAFK = nil,
+    AutoBuyNext = nil,
+    AutoBuyManage = nil,
+    AutoBuyWalkSpeed = nil,
+    AutoBuyUpgradeStack = nil,
+    AutoBuyClickFruitValue = nil
 }
 
 -- ============================
@@ -227,25 +241,33 @@ end
 -- ============================
 local function UpgradePower(powerType, amount)
     amount = amount or 1
-    local myTycoon = getMyTycoon() or Workspace:FindFirstChild("Tycoon9")
+    local myTycoon = getMyTycoon() or Workspace:FindFirstChild("Tycoon1") or Workspace:FindFirstChild("Tycoon9")
     if myTycoon then
         local remotes = myTycoon:FindFirstChild("Remotes")
         if remotes then
             local event = remotes:FindFirstChild("UpgradePowerLevel")
-            if event and event:IsA("RemoteFunction") then
+            if event then
                 local success, err = pcall(function()
-                    event:InvokeServer(powerType, amount)
+                    if event:IsA("RemoteFunction") then
+                        event:InvokeServer(powerType, amount)
+                    elseif event:IsA("RemoteEvent") then
+                        event:FireServer(powerType, amount)
+                    end
                 end)
-                if success then
-                    Rayfield:Notify({Title = "🛒 Mua thành công", Content = "Đã nâng cấp: " .. powerType .. " (" .. myTycoon.Name .. ")", Duration = 2.5})
-                else
-                    Rayfield:Notify({Title = "⚠️ Thất bại", Content = "Lỗi khi gọi Remote!", Duration = 2.5})
-                end
-                return
+                return success
             end
         end
     end
-    Rayfield:Notify({Title = "⚠️ Lỗi", Content = "Không tìm thấy Remote UpgradePowerLevel trên Tycoon!", Duration = 3})
+    
+    -- Fallback trực tiếp Tycoon1 nếu không tìm thấy Tycoon riêng
+    pcall(function()
+        local Event = Workspace.Tycoon1.Remotes.UpgradePowerLevel
+        if Event:IsA("RemoteFunction") then
+            Event:InvokeServer(powerType, amount)
+        else
+            Event:FireServer(powerType, amount)
+        end
+    end)
 end
 
 -- ============================
@@ -276,6 +298,28 @@ local function BuyOrchard()
         Workspace:WaitForChild("Tycoon7"):WaitForChild("Remotes"):WaitForChild("UnlockOrchard"):InvokeServer()
         Rayfield:Notify({Title = "🌳", Content = "Đã gửi lệnh Mua nông trại (Tycoon7)!", Duration = 3})
     end)
+end
+
+-- ============================
+-- HÀM MUA CHỖ TRỒNG CÂY (PLOT 1 -> 100)
+-- ============================
+local function DoUnlockPlot()
+    local myTycoon = getMyTycoon() or Workspace:FindFirstChild("Tycoon7")
+    if not myTycoon then return end
+
+    local remotes = myTycoon:FindFirstChild("Remotes")
+    if not remotes then return end
+
+    local unlockPlotRemote = remotes:FindFirstChild("UnlockPlot")
+    if unlockPlotRemote and unlockPlotRemote:IsA("RemoteFunction") then
+        for i = 1, 100 do
+            if not _G_AutoUnlockPlot then break end
+            pcall(function()
+                unlockPlotRemote:InvokeServer(i)
+            end)
+            task.wait(0.02)
+        end
+    end
 end
 
 -- ============================
@@ -514,17 +558,37 @@ local function HarvestOnce()
 end
 
 -- ============================
--- HÀM NHẶT BAO TIỀN (SIÊU TOC)
+-- HÀM NHẶT BAO TIỀN (SỬA LỖI)
 -- ============================
 local function CollectMoneyOnce()
     pcall(function()
-        local Event = ReplicatedStorage:WaitForChild("Core"):WaitForChild("RemoteRequest")["DropService.Redeem"]
-        if Event then
-            local randomVal = tostring(math.random(1, 50000))
-            if Event:IsA("RemoteFunction") then
-                Event:InvokeServer(randomVal)
-            elseif Event:IsA("RemoteEvent") then
-                Event:FireServer(randomVal)
+        local core = ReplicatedStorage:FindFirstChild("Core")
+        if core then
+            local remoteReq = core:FindFirstChild("RemoteRequest")
+            if remoteReq then
+                local redeemRemote = remoteReq:FindFirstChild("DropService.Redeem")
+                if redeemRemote then
+                    if redeemRemote:IsA("RemoteFunction") then
+                        redeemRemote:InvokeServer()
+                    elseif redeemRemote:IsA("RemoteEvent") then
+                        redeemRemote:FireServer()
+                    end
+                end
+            end
+        end
+
+        local dropsFolder = Workspace:FindFirstChild("Drops") or Workspace:FindFirstChild("DropsFolder") or Workspace
+        for _, drop in ipairs(dropsFolder:GetChildren()) do
+            if drop.Name:lower():find("money") or drop.Name:lower():find("cash") or drop.Name:lower():find("drop") or drop.Name:lower():find("bag") then
+                if drop:IsA("BasePart") and RootPart then
+                    firetouchinterest(RootPart, drop, 0)
+                    task.wait()
+                    firetouchinterest(RootPart, drop, 1)
+                elseif drop:IsA("Model") and drop.PrimaryPart and RootPart then
+                    firetouchinterest(RootPart, drop.PrimaryPart, 0)
+                    task.wait()
+                    firetouchinterest(RootPart, drop.PrimaryPart, 1)
+                end
             end
         end
     end)
@@ -558,14 +622,73 @@ local ShopTab = Window:CreateTab("Mua đồ", 4483362458)
 
 ShopTab:CreateParagraph({
     Title = "🛒 Cửa hàng Tycoon",
-    Content = "Tự động xác định Tycoon của bạn và thực hiện các nâng cấp PowerLevel."
+    Content = "Mua đồ thủ công hoặc bật tự động mua liên tục."
 })
+
+-- NÚT MUA MÁY NÂNG CẤP TỪ XA (BUY NEXT)
+ShopTab:CreateButton({
+    Name = "mua máy nâng cấp từ xa",
+    Callback = function()
+        local success = UpgradePower("BuyNext", 1)
+        if success then
+            Rayfield:Notify({Title = "🛒", Content = "Đã mua máy nâng cấp từ xa!", Duration = 2})
+        else
+            Rayfield:Notify({Title = "⚠️ Lỗi", Content = "Mua máy nâng cấp từ xa thất bại!", Duration = 2})
+        end
+    end,
+})
+
+ShopTab:CreateToggle({
+    Name = "Tự động mua máy nâng cấp từ xa",
+    CurrentValue = false,
+    Flag = "ToggleAutoBuyNext",
+    Callback = function(Value)
+        _G_AutoBuyNext = Value
+        if Threads.AutoBuyNext then
+            task.cancel(Threads.AutoBuyNext)
+            Threads.AutoBuyNext = nil
+        end
+
+        if _G_AutoBuyNext then
+            Threads.AutoBuyNext = task.spawn(function()
+                while _G_AutoBuyNext do
+                    UpgradePower("BuyNext", 1)
+                    task.wait(0.2)
+                end
+            end)
+        end
+    end
+})
+
+ShopTab:CreateSection("Nâng cấp khác")
 
 ShopTab:CreateButton({
     Name = "mua quản lí",
     Callback = function()
         UpgradePower("Manage", 1)
     end,
+})
+
+ShopTab:CreateToggle({
+    Name = "Tự động mua quản lí",
+    CurrentValue = false,
+    Flag = "ToggleAutoBuyManage",
+    Callback = function(Value)
+        _G_AutoBuyManage = Value
+        if Threads.AutoBuyManage then
+            task.cancel(Threads.AutoBuyManage)
+            Threads.AutoBuyManage = nil
+        end
+
+        if _G_AutoBuyManage then
+            Threads.AutoBuyManage = task.spawn(function()
+                while _G_AutoBuyManage do
+                    UpgradePower("Manage", 1)
+                    task.wait(0.2)
+                end
+            end)
+        end
+    end
 })
 
 ShopTab:CreateButton({
@@ -575,6 +698,28 @@ ShopTab:CreateButton({
     end,
 })
 
+ShopTab:CreateToggle({
+    Name = "Tự động mua thêm speed",
+    CurrentValue = false,
+    Flag = "ToggleAutoBuyWalkSpeed",
+    Callback = function(Value)
+        _G_AutoBuyWalkSpeed = Value
+        if Threads.AutoBuyWalkSpeed then
+            task.cancel(Threads.AutoBuyWalkSpeed)
+            Threads.AutoBuyWalkSpeed = nil
+        end
+
+        if _G_AutoBuyWalkSpeed then
+            Threads.AutoBuyWalkSpeed = task.spawn(function()
+                while _G_AutoBuyWalkSpeed do
+                    UpgradePower("WalkSpeed", 1)
+                    task.wait(0.2)
+                end
+            end)
+        end
+    end
+})
+
 ShopTab:CreateButton({
     Name = "mua nâng cấp nhiều hơn",
     Callback = function()
@@ -582,11 +727,55 @@ ShopTab:CreateButton({
     end,
 })
 
+ShopTab:CreateToggle({
+    Name = "Tự động mua nâng cấp nhiều hơn",
+    CurrentValue = false,
+    Flag = "ToggleAutoBuyUpgradeStack",
+    Callback = function(Value)
+        _G_AutoBuyUpgradeStack = Value
+        if Threads.AutoBuyUpgradeStack then
+            task.cancel(Threads.AutoBuyUpgradeStack)
+            Threads.AutoBuyUpgradeStack = nil
+        end
+
+        if _G_AutoBuyUpgradeStack then
+            Threads.AutoBuyUpgradeStack = task.spawn(function()
+                while _G_AutoBuyUpgradeStack do
+                    UpgradePower("UpgradeStack", 1)
+                    task.wait(0.2)
+                end
+            end)
+        end
+    end
+})
+
 ShopTab:CreateButton({
     Name = "lụm trái thêm tiền",
     Callback = function()
         UpgradePower("ClickFruitValue", 1)
     end,
+})
+
+ShopTab:CreateToggle({
+    Name = "Tự động lụm trái thêm tiền",
+    CurrentValue = false,
+    Flag = "ToggleAutoBuyClickFruitValue",
+    Callback = function(Value)
+        _G_AutoBuyClickFruitValue = Value
+        if Threads.AutoBuyClickFruitValue then
+            task.cancel(Threads.AutoBuyClickFruitValue)
+            Threads.AutoBuyClickFruitValue = nil
+        end
+
+        if _G_AutoBuyClickFruitValue then
+            Threads.AutoBuyClickFruitValue = task.spawn(function()
+                while _G_AutoBuyClickFruitValue do
+                    UpgradePower("ClickFruitValue", 1)
+                    task.wait(0.2)
+                end
+            end)
+        end
+    end
 })
 
 -- ============================
@@ -604,6 +793,31 @@ FarmTab:CreateButton({
     Callback = function()
         BuyOrchard()
     end,
+})
+
+FarmTab:CreateToggle({
+    Name = "mua chỗ trồng cây",
+    CurrentValue = false,
+    Flag = "ToggleUnlockPlot",
+    Callback = function(Value)
+        _G_AutoUnlockPlot = Value
+        if Threads.UnlockPlot then
+            task.cancel(Threads.UnlockPlot)
+            Threads.UnlockPlot = nil
+        end
+
+        if _G_AutoUnlockPlot then
+            Rayfield:Notify({Title = "🌱", Content = "Đã BẬT tự động mua chỗ trồng cây (1 -> 100)!", Duration = 3})
+            Threads.UnlockPlot = task.spawn(function()
+                while _G_AutoUnlockPlot do
+                    DoUnlockPlot()
+                    task.wait(1)
+                end
+            end)
+        else
+            Rayfield:Notify({Title = "⏹️", Content = "Đã TẮT mua chỗ trồng cây!", Duration = 2})
+        end
+    end
 })
 
 FarmTab:CreateParagraph({
@@ -973,7 +1187,7 @@ HarvestTab:CreateToggle({
 })
 
 HarvestTab:CreateToggle({
-    Name = "Nhặt bao tiền",
+    Name = "Nhặt bao tiền (Đã sửa lỗi)",
     CurrentValue = false,
     Flag = "ToggleCollectMoney",
     Callback = function(Value)
@@ -984,12 +1198,15 @@ HarvestTab:CreateToggle({
         end
 
         if _G_AutoRedeem then
+            Rayfield:Notify({Title = "💰", Content = "Đã BẬT tự động nhặt bao tiền!", Duration = 2})
             Threads.Redeem = task.spawn(function()
                 while _G_AutoRedeem do
                     CollectMoneyOnce()
-                    task.wait(0.0001)
+                    task.wait(0.1)
                 end
             end)
+        else
+            Rayfield:Notify({Title = "⏹️", Content = "Đã TẮT nhặt bao tiền!", Duration = 2})
         end
     end
 })
