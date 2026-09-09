@@ -1,9 +1,10 @@
+
 -- [[ TẢI RAYFIELD ]]
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 -- [[ CỬA SỔ CHÍNH ]]
 local Window = Rayfield:CreateWindow({
-   Name = "🍋menu bán chanh🍋 v3.4 vip (đang sửa)",
+   Name = "🍋menu bán chanh🍋 v3.4 vip",
    Icon = 0,
    LoadingTitle = "Đang tải...",
    LoadingSubtitle = "by Assistant",
@@ -173,15 +174,6 @@ local function SendWebhook(messageText)
 end
 
 -- ============================
--- HÀM GIẢ LẬP CẢM ỨNG UI
--- ============================
-local function touchAtPosition(x, y)
-    VirtualInputManager:SendTouchEvent(0, 0, x, y, game)
-    task.wait(0.02)
-    VirtualInputManager:SendTouchEvent(0, 2, x, y, game)
-end
-
--- ============================
 -- HÀM TÌM TYCOON CỦA NGƯỜI CHƠI
 -- ============================
 local function getMyTycoon()
@@ -233,7 +225,7 @@ local function UpgradePower(powerType, amount)
         if remotes then
             local event = remotes:FindFirstChild("UpgradePowerLevel")
             if event then
-                local success, err = pcall(function()
+                local success = pcall(function()
                     if event:IsA("RemoteFunction") then
                         event:InvokeServer(powerType, amount)
                     elseif event:IsA("RemoteEvent") then
@@ -245,7 +237,7 @@ local function UpgradePower(powerType, amount)
         end
     end
     
-    local success, err = pcall(function()
+    local success = pcall(function()
         local Event = Workspace.Tycoon3.Remotes.UpgradePowerLevel
         if Event:IsA("RemoteFunction") then
             Event:InvokeServer(powerType, amount)
@@ -348,7 +340,7 @@ local function DoUpgrade(amount)
                         if upgradeRemoteX and upgradeRemoteX:IsA("RemoteFunction") then
                             task.spawn(function()
                                 for i = 1, amount do
-                                    if not _G_AutoUpgrade me break end
+                                    if not _G_AutoUpgrade then break end
                                     pcall(function() upgradeRemoteX:InvokeServer(1) end)
                                 end
                             end)
@@ -550,7 +542,7 @@ local function ClickFruit(fruit)
         return true
     end
 
-    if clickDetector.MouseClick then
+    if firesignal and clickDetector.MouseClick then
         pcall(function() firesignal(clickDetector.MouseClick) end)
         return true
     end
@@ -597,11 +589,11 @@ local function CollectMoneyOnce()
         local dropsFolder = Workspace:FindFirstChild("Drops") or Workspace:FindFirstChild("DropsFolder") or Workspace
         for _, drop in ipairs(dropsFolder:GetChildren()) do
             if drop.Name:lower():find("money") or drop.Name:lower():find("cash") or drop.Name:lower():find("drop") or drop.Name:lower():find("bag") then
-                if drop:IsA("BasePart") and RootPart then
+                if drop:IsA("BasePart") and RootPart and firetouchinterest then
                     firetouchinterest(RootPart, drop, 0)
                     task.wait()
                     firetouchinterest(RootPart, drop, 1)
-                elseif drop:IsA("Model") and drop.PrimaryPart and RootPart then
+                elseif drop:IsA("Model") and drop.PrimaryPart and RootPart and firetouchinterest then
                     firetouchinterest(RootPart, drop.PrimaryPart, 0)
                     task.wait()
                     firetouchinterest(RootPart, drop.PrimaryPart, 1)
@@ -649,7 +641,7 @@ ShopTab:CreateButton({
         if success then
             Rayfield:Notify({Title = "🍎", Content = "Đã mua đồ ăn trái cây thành công!", Duration = 2})
         else
-            Rayfield:Notify({Title = "⚠️ Lỗi", Content = "Mua đồ ăn trái cây thất bại! Kiểm tra lại Remote.", Duration = 2})
+            Rayfield:Notify({Title = "⚠️ Lỗi", Content = "Mua đồ ăn trái cây thất bại!", Duration = 2})
         end
     end,
 })
@@ -930,38 +922,6 @@ FarmTab:CreateButton({
     end,
 })
 
-FarmTab:CreateButton({
-    Name = "xây dựng nhà 10 lần (Delay 0.05s)",
-    Callback = function()
-        Rayfield:Notify({Title = "🏗️", Content = "Đang chạy xây dựng 10 lần (0.05s/lần)...", Duration = 2})
-        task.spawn(function()
-            local successCount = 0
-            for i = 1, 10 do
-                local ok, _ = DoRemoteBuild()
-                if ok then successCount = successCount + 1 end
-                task.wait(0.05)
-            end
-            Rayfield:Notify({Title = "✅ Hoàn thành", Content = "Đã thực hiện xong 10 lần xây dựng! (" .. successCount .. "/10 thành công)", Duration = 3})
-        end)
-    end,
-})
-
-FarmTab:CreateButton({
-    Name = "xây dựng nhà 50 lần (Delay 0.07s)",
-    Callback = function()
-        Rayfield:Notify({Title = "🏗️", Content = "Đang chạy xây dựng 50 lần (0.07s/lần)...", Duration = 3})
-        task.spawn(function()
-            local successCount = 0
-            for i = 1, 50 do
-                local ok, _ = DoRemoteBuild()
-                if ok then successCount = successCount + 1 end
-                task.wait(0.07)
-            end
-            Rayfield:Notify({Title = "✅ Hoàn thành", Content = "Đã thực hiện xong 50 lần xây dựng! (" .. successCount .. "/50 thành công)", Duration = 3})
-        end)
-    end,
-})
-
 FarmTab:CreateToggle({
     Name = "xây bằng máy mua tự động từ xa (Liên tục)",
     CurrentValue = false,
@@ -1059,7 +1019,7 @@ FarmTab:CreateButton({
     Callback = function()
         teleportWithNoclip(CFrame.new(31.14, -41.98, -76.38))
         
-        local success, err = pcall(function()
+        local success = pcall(function()
             local Event = workspace.Map.Sewer.CashVine.VineDoor.Door.Unlock
             Event:InvokeServer()
         end)
@@ -1594,7 +1554,7 @@ FeedbackTab:CreateButton({
 
 FeedbackTab:CreateParagraph({
     Title = "⚠️ QUY ĐỊNH PHẢN HỒI",
-    Content = "Tất cả phản hồi sẽ gửi thông tin Tên & ID Roblox của bạn đến Admin. Nghiêm cấm gửi tin nhắn spam, troll hoặc xúc phạm! Nếu cố tình vi phạm, tài khoản/nhân vật của bạn sẽ bị BAN và script sẽ vĩnh viễn không cho phép bạn sử dụng nữa."
+    Content = "Tất cả phản hồi sẽ gửi thông tin Tên & ID Roblox của bạn đến Admin."
 })
 
 FeedbackTab:CreateInput({
@@ -1623,4 +1583,4 @@ FeedbackTab:CreateButton({
     end,
 })
 
-Rayfield:Notify({Title = "🍋", Content = "🍋menu bán chanh🍋 v3.4 vip (đang sửa) đã sẵn sàng!", Duration = 3})
+Rayfield:Notify({Title = "🍋", Content = "🍋menu bán chanh🍋 v3.4 vip đã sẵn sàng!", Duration = 3})
