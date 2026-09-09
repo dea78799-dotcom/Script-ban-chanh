@@ -58,6 +58,7 @@ local _G_AutoBuyManage = false
 local _G_AutoBuyWalkSpeed = false
 local _G_AutoBuyUpgradeStack = false
 local _G_AutoBuyClickFruitValue = false
+local _G_AutoBuyFruit = false
 
 local UpgradeAmount = 10
 local RebirthDelay = 15
@@ -87,7 +88,8 @@ local Threads = {
     AutoBuyManage = nil,
     AutoBuyWalkSpeed = nil,
     AutoBuyUpgradeStack = nil,
-    AutoBuyClickFruitValue = nil
+    AutoBuyClickFruitValue = nil,
+    AutoBuyFruit = nil
 }
 
 -- ============================
@@ -179,24 +181,6 @@ local function touchAtPosition(x, y)
     VirtualInputManager:SendTouchEvent(0, 2, x, y, game)
 end
 
-local function clickGuiObject(guiObject)
-    if not guiObject then return end
-    
-    if firesignal then
-        pcall(function() firesignal(guiObject.MouseButton1Click) end)
-        pcall(function() firesignal(guiObject.Activated) end)
-    else
-        local pos = guiObject.AbsolutePosition
-        local size = guiObject.AbsoluteSize
-        local inset = GuiService:GetGuiInset()
-        
-        local x = pos.X + (size.X / 2)
-        local y = pos.Y + (size.Y / 2) + inset.Y
-        
-        touchAtPosition(x, y)
-    end
-end
-
 -- ============================
 -- HÀM TÌM TYCOON CỦA NGƯỜI CHƠI
 -- ============================
@@ -243,7 +227,7 @@ end
 -- ============================
 local function UpgradePower(powerType, amount)
     amount = amount or 1
-    local myTycoon = getMyTycoon() or Workspace:FindFirstChild("Tycoon1") or Workspace:FindFirstChild("Tycoon9")
+    local myTycoon = getMyTycoon() or Workspace:FindFirstChild("Tycoon3") or Workspace:FindFirstChild("Tycoon1")
     if myTycoon then
         local remotes = myTycoon:FindFirstChild("Remotes")
         if remotes then
@@ -261,14 +245,15 @@ local function UpgradePower(powerType, amount)
         end
     end
     
-    pcall(function()
-        local Event = Workspace.Tycoon1.Remotes.UpgradePowerLevel
+    local success, err = pcall(function()
+        local Event = Workspace.Tycoon3.Remotes.UpgradePowerLevel
         if Event:IsA("RemoteFunction") then
             Event:InvokeServer(powerType, amount)
         else
             Event:FireServer(powerType, amount)
         end
     end)
+    return success
 end
 
 -- ============================
@@ -363,7 +348,7 @@ local function DoUpgrade(amount)
                         if upgradeRemoteX and upgradeRemoteX:IsA("RemoteFunction") then
                             task.spawn(function()
                                 for i = 1, amount do
-                                    if not _G_AutoUpgrade then break end
+                                    if not _G_AutoUpgrade me break end
                                     pcall(function() upgradeRemoteX:InvokeServer(1) end)
                                 end
                             end)
@@ -398,26 +383,32 @@ end
 -- ============================
 local function DoRemoteBuild()
     local myTycoon = getMyTycoon() or Workspace:FindFirstChild("Tycoon7")
-    if not myTycoon then return end
+    if not myTycoon then 
+        return false, "Không tìm thấy Tycoon!"
+    end
 
     local purchases = myTycoon:FindFirstChild("Purchases")
-    if not purchases then return end
+    if not purchases then 
+        return false, "Không tìm thấy Purchases trong Tycoon!"
+    end
 
+    local count = 0
     for _, item in pairs(purchases:GetDescendants()) do
-        if not _G_AutoRemoteBuild then break end
-
         if item.Name == "Purchase" then
             if item:IsA("RemoteFunction") then
                 task.spawn(function()
                     pcall(function() item:InvokeServer(true, false) end)
                 end)
+                count = count + 1
             elseif item:IsA("RemoteEvent") then
                 task.spawn(function()
                     pcall(function() item:FireServer(true, false) end)
                 end)
+                count = count + 1
             end
         end
     end
+    return true, "Đã gửi " .. count .. " lệnh mua!"
 end
 
 -- ============================
@@ -652,6 +643,45 @@ ShopTab:CreateParagraph({
 })
 
 ShopTab:CreateButton({
+    Name = "mua đồ ăn trái cây",
+    Callback = function()
+        local success = UpgradePower("AutoFruit", 1)
+        if success then
+            Rayfield:Notify({Title = "🍎", Content = "Đã mua đồ ăn trái cây thành công!", Duration = 2})
+        else
+            Rayfield:Notify({Title = "⚠️ Lỗi", Content = "Mua đồ ăn trái cây thất bại! Kiểm tra lại Remote.", Duration = 2})
+        end
+    end,
+})
+
+ShopTab:CreateToggle({
+    Name = "Tự động mua đồ ăn trái cây",
+    CurrentValue = false,
+    Flag = "ToggleAutoBuyFruit",
+    Callback = function(Value)
+        _G_AutoBuyFruit = Value
+        if Threads.AutoBuyFruit then
+            task.cancel(Threads.AutoBuyFruit)
+            Threads.AutoBuyFruit = nil
+        end
+
+        if _G_AutoBuyFruit then
+            Rayfield:Notify({Title = "🍎", Content = "Đã BẬT tự động mua đồ ăn trái cây!", Duration = 2})
+            Threads.AutoBuyFruit = task.spawn(function()
+                while _G_AutoBuyFruit do
+                    UpgradePower("AutoFruit", 1)
+                    task.wait(0.2)
+                end
+            end)
+        else
+            Rayfield:Notify({Title = "⏹️", Content = "Đã TẮT tự động mua đồ ăn trái cây!", Duration = 2})
+        end
+    end
+})
+
+ShopTab:CreateSection("Máy & Quản lý")
+
+ShopTab:CreateButton({
     Name = "mua máy nâng cấp từ xa",
     Callback = function()
         local success = UpgradePower("BuyNext", 1)
@@ -684,8 +714,6 @@ ShopTab:CreateToggle({
         end
     end
 })
-
-ShopTab:CreateSection("Nâng cấp khác")
 
 ShopTab:CreateButton({
     Name = "mua quản lí",
@@ -887,13 +915,55 @@ FarmTab:CreateSlider({
     end,
 })
 
-FarmTab:CreateParagraph({
-    Title = "🏠 Tự động xây nhà",
-    Content = "Mua các nút còn thiếu trong Tycoon."
+FarmTab:CreateSection("🏗️ Xây Dựng Từ Xa")
+
+FarmTab:CreateButton({
+    Name = "xây dựng nhà 1 lần",
+    Callback = function()
+        Rayfield:Notify({Title = "🏗️", Content = "Đang thực hiện xây dựng nhà 1 lần...", Duration = 2})
+        local ok, msg = DoRemoteBuild()
+        if ok then
+            Rayfield:Notify({Title = "✅ Thành công", Content = "Xây dựng 1 lần hoàn tất! (" .. msg .. ")", Duration = 3})
+        else
+            Rayfield:Notify({Title = "❌ Lỗi", Content = "Lỗi: " .. msg, Duration = 3})
+        end
+    end,
+})
+
+FarmTab:CreateButton({
+    Name = "xây dựng nhà 10 lần (Delay 0.05s)",
+    Callback = function()
+        Rayfield:Notify({Title = "🏗️", Content = "Đang chạy xây dựng 10 lần (0.05s/lần)...", Duration = 2})
+        task.spawn(function()
+            local successCount = 0
+            for i = 1, 10 do
+                local ok, _ = DoRemoteBuild()
+                if ok then successCount = successCount + 1 end
+                task.wait(0.05)
+            end
+            Rayfield:Notify({Title = "✅ Hoàn thành", Content = "Đã thực hiện xong 10 lần xây dựng! (" .. successCount .. "/10 thành công)", Duration = 3})
+        end)
+    end,
+})
+
+FarmTab:CreateButton({
+    Name = "xây dựng nhà 50 lần (Delay 0.07s)",
+    Callback = function()
+        Rayfield:Notify({Title = "🏗️", Content = "Đang chạy xây dựng 50 lần (0.07s/lần)...", Duration = 3})
+        task.spawn(function()
+            local successCount = 0
+            for i = 1, 50 do
+                local ok, _ = DoRemoteBuild()
+                if ok then successCount = successCount + 1 end
+                task.wait(0.07)
+            end
+            Rayfield:Notify({Title = "✅ Hoàn thành", Content = "Đã thực hiện xong 50 lần xây dựng! (" .. successCount .. "/50 thành công)", Duration = 3})
+        end)
+    end,
 })
 
 FarmTab:CreateToggle({
-    Name = "xây bằng máy mua tự động từ xa",
+    Name = "xây bằng máy mua tự động từ xa (Liên tục)",
     CurrentValue = false,
     Flag = "ToggleAutoRemoteBuild",
     Callback = function(Value)
@@ -907,7 +977,10 @@ FarmTab:CreateToggle({
             Rayfield:Notify({Title = "🏗️", Content = "Đã BẬT xây bằng máy mua tự động từ xa!", Duration = 2})
             Threads.RemoteBuild = task.spawn(function()
                 while _G_AutoRemoteBuild do
-                    DoRemoteBuild()
+                    local ok, err = DoRemoteBuild()
+                    if not ok then
+                        Rayfield:Notify({Title = "⚠️ Lỗi Tự Động Xây", Content = err, Duration = 3})
+                    end
                     task.wait(0.2)
                 end
             end)
@@ -930,7 +1003,7 @@ FarmTab:CreateButton({
 })
 
 FarmTab:CreateToggle({
-    Name = "Tự động xây dựng nhà",
+    Name = "Tự động xây dựng nhà (Bản Cũ)",
     CurrentValue = false,
     Flag = "ToggleBuildHouse",
     Callback = function(Value)
@@ -959,6 +1032,8 @@ FarmTab:CreateToggle({
                                 end)
                             end
                         end
+                    else
+                        Rayfield:Notify({Title = "⚠️ Lỗi", Content = "Không tìm thấy Tycoon để xây dựng!", Duration = 2})
                     end
                     task.wait(0.1)
                 end
@@ -969,10 +1044,7 @@ FarmTab:CreateToggle({
     end
 })
 
-FarmTab:CreateParagraph({
-    Title = "🔑 Khóa Cửa Cây",
-    Content = "Các chức năng hỗ trợ lấy key và mở khóa cửa cây."
-})
+FarmTab:CreateSection("🔑 Khóa Cửa Cây")
 
 FarmTab:CreateButton({
     Name = "Lấy key mở cửa cây",
@@ -1226,12 +1298,15 @@ HarvestTab:CreateToggle({
         end
 
         if _G_AutoHarvest then
+            Rayfield:Notify({Title = "🍎", Content = "Đã BẬT tự động hái quả!", Duration = 2})
             Threads.Harvest = task.spawn(function()
                 while _G_AutoHarvest do
                     HarvestOnce()
                     task.wait(0.1)
                 end
             end)
+        else
+            Rayfield:Notify({Title = "⏹️", Content = "Đã TẮT hái quả!", Duration = 2})
         end
     end
 })
