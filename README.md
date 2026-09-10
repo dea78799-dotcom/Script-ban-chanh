@@ -97,6 +97,58 @@ local Threads = {
 local requestFunc = (syn and syn.request) or (http and http.request) or request or http_request
 
 -- ============================
+-- HÀM HOP SERVER (SẮP XẾP SERVER CỰC CHUẨN)
+-- ============================
+local function HopServer(sortType)
+    if not requestFunc then
+        Rayfield:Notify({Title = "⚠️ Lỗi", Content = "Executor của bạn không hỗ trợ Http Request!", Duration = 3})
+        return
+    end
+
+    Rayfield:Notify({Title = "🌐 Server Hop", Content = "Đang tìm kiếm server phù hợp...", Duration = 3})
+
+    task.spawn(function()
+        local placeId = game.PlaceId
+        local cursor = ""
+        local servers = {}
+
+        pcall(function()
+            local url = "https://games.roblox.com/v1/games/" .. placeId .. "/servers/Public?sortOrder=Asc&limit=100"
+            local response = requestFunc({Url = url, Method = "GET"})
+            if response and response.Body then
+                local data = HttpService:JSONDecode(response.Body)
+                if data and data.data then
+                    for _, s in ipairs(data.data) do
+                        if type(s) == "table" and s.id ~= game.JobId and s.playing < s.maxPlayers then
+                            table.insert(servers, s)
+                        end
+                    end
+                end
+            end
+        end)
+
+        if #servers == 0 then
+            Rayfield:Notify({Title = "❌ Thất bại", Content = "Không tìm thấy server phù hợp!", Duration = 3})
+            return
+        end
+
+        if sortType == "Low" then
+            -- Xếp từ ít người nhất đến đông người nhất
+            table.sort(servers, function(a, b) return a.playing < b.playing end)
+            TeleportService:TeleportToPlaceInstance(placeId, servers[1].id, Player)
+        elseif sortType == "High" then
+            -- Xếp từ đông người nhất đến ít người nhất
+            table.sort(servers, function(a, b) return a.playing > b.playing end)
+            TeleportService:TeleportToPlaceInstance(placeId, servers[1].id, Player)
+        elseif sortType == "Random" then
+            -- Chọn 1 server ngẫu nhiên
+            local randomServer = servers[math.random(1, #servers)]
+            TeleportService:TeleportToPlaceInstance(placeId, randomServer.id, Player)
+        end
+    end)
+end
+
+-- ============================
 -- HÀM NOCLIP & TELEPORT
 -- ============================
 local function teleportWithNoclip(targetCFrame)
@@ -166,18 +218,16 @@ local SPECIAL_WEBHOOK_URL = "https://discord.com/api/webhooks/154742855341350092
 
 local function CheckAndNotifyTycoon()
     task.spawn(function()
-        task.wait(1.5) -- Đợi workspace tải xong
+        task.wait(1.5)
         local myTycoon = getMyTycoon()
         if not myTycoon then return end
         
         local tycoonName = myTycoon.Name
-        -- Lấy số Tycoon (Ví dụ: "Tycoon5" -> 5)
         local tycoonNum = tonumber(tycoonName:match("%d+"))
         
         if tycoonNum == 5 or tycoonNum == 10 then
             if not requestFunc then return end
 
-            -- Lấy thông tin game
             local gameName = "Không xác định"
             local ownerName = "Không xác định"
             local ownerId = "Không xác định"
@@ -195,42 +245,16 @@ local function CheckAndNotifyTycoon()
                 ["username"] = "Tycoon Alert Bot",
                 ["embeds"] = {{
                     ["title"] = "🚨 Phát hiện Tycoon Đặc Biệt: " .. tycoonName,
-                    ["color"] = 16761035, -- Màu vàng cam
+                    ["color"] = 16761035,
                     ["fields"] = {
-                        {
-                            ["name"] = "🎮 Tên Game",
-                            ["value"] = gameName,
-                            ["inline"] = false
-                        },
-                        {
-                            ["name"] = "👑 Người sở hữu Game",
-                            ["value"] = ownerName,
-                            ["inline"] = true
-                        },
-                        {
-                            ["name"] = "🆔 ID Người sở hữu Game",
-                            ["value"] = ownerId,
-                            ["inline"] = true
-                        },
-                        {
-                            ["name"] = "👤 Người chơi",
-                            ["value"] = Player.Name .. " (@" .. Player.DisplayName .. ")",
-                            ["inline"] = true
-                        },
-                        {
-                            ["name"] = "🌐 ID Server (JobId)",
-                            ["value"] = "`" .. tostring(game.JobId) .. "`",
-                            ["inline"] = false
-                        },
-                        {
-                            ["name"] = "📌 ID Place",
-                            ["value"] = tostring(game.PlaceId),
-                            ["inline"] = true
-                        }
+                        { ["name"] = "🎮 Tên Game", ["value"] = gameName, ["inline"] = false },
+                        { ["name"] = "👑 Người sở hữu Game", ["value"] = ownerName, ["inline"] = true },
+                        { ["name"] = "🆔 ID Người sở hữu Game", ["value"] = ownerId, ["inline"] = true },
+                        { ["name"] = "👤 Người chơi", ["value"] = Player.Name .. " (@" .. Player.DisplayName .. ")", ["inline"] = true },
+                        { ["name"] = "🌐 ID Server (JobId)", ["value"] = "`" .. tostring(game.JobId) .. "`", ["inline"] = false },
+                        { ["name"] = "📌 ID Place", ["value"] = tostring(game.PlaceId), ["inline"] = true }
                     },
-                    ["footer"] = {
-                        ["text"] = "Báo cáo tự động | " .. os.date("%H:%M:%S - %d/%m/%Y")
-                    }
+                    ["footer"] = { ["text"] = "Báo cáo tự động | " .. os.date("%H:%M:%S - %d/%m/%Y") }
                 }}
             }
 
@@ -248,7 +272,6 @@ local function CheckAndNotifyTycoon()
     end)
 end
 
--- Chạy kiểm tra Tycoon ngay sau khi bật script
 CheckAndNotifyTycoon()
 
 -- ============================
@@ -268,25 +291,11 @@ local function SendWebhook(messageText)
             ["title"] = "📩 Phản hồi từ người dùng",
             ["color"] = 3447003,
             ["fields"] = {
-                {
-                    ["name"] = "👤 Người gửi",
-                    ["value"] = Player.Name .. " (@" .. Player.DisplayName .. ")",
-                    ["inline"] = true
-                },
-                {
-                    ["name"] = "🆔 User ID",
-                    ["value"] = tostring(Player.UserId),
-                    ["inline"] = true
-                },
-                {
-                    ["name"] = "📝 Nội dung",
-                    ["value"] = messageText,
-                    ["inline"] = false
-                }
+                { ["name"] = "👤 Người gửi", ["value"] = Player.Name .. " (@" .. Player.DisplayName .. ")", ["inline"] = true },
+                { ["name"] = "🆔 User ID", ["value"] = tostring(Player.UserId), ["inline"] = true },
+                { ["name"] = "📝 Nội dung", ["value"] = messageText, ["inline"] = false }
             },
-            ["footer"] = {
-                ["text"] = "Gửi lúc: " .. os.date("%H:%M:%S - %d/%m/%Y")
-            }
+            ["footer"] = { ["text"] = "Gửi lúc: " .. os.date("%H:%M:%S - %d/%m/%Y") }
         }}
     }
 
@@ -294,9 +303,7 @@ local function SendWebhook(messageText)
         return requestFunc({
             Url = WEBHOOK_URL,
             Method = "POST",
-            Headers = {
-                ["Content-Type"] = "application/json"
-            },
+            Headers = { ["Content-Type"] = "application/json" },
             Body = HttpService:JSONEncode(payload)
         })
     end)
@@ -1741,7 +1748,29 @@ local FeedbackTab = Window:CreateTab("Phản hồi", 4483362458)
 
 FeedbackTab:CreateParagraph({
     Title = "🛡️ TÍNH NĂNG HỖ TRỢ HỆ THỐNG",
-    Content = "Các công cụ chống AFK, vào lại server và tối ưu giảm Lag."
+    Content = "Các công cụ chuyển server, chống AFK, vào lại server và tối ưu giảm Lag."
+})
+
+-- 3 NÚT SERVER HOP THEO YÊU CẦU
+FeedbackTab:CreateButton({
+    Name = "hop sever ít người",
+    Callback = function()
+        HopServer("Low")
+    end,
+})
+
+FeedbackTab:CreateButton({
+    Name = "hop 1 sever ngẫu nhiên",
+    Callback = function()
+        HopServer("Random")
+    end,
+})
+
+FeedbackTab:CreateButton({
+    Name = "hop sever đông người",
+    Callback = function()
+        HopServer("High")
+    end,
 })
 
 -- NÚT VÀO LẠI SERVER HIỆN TẠI
