@@ -97,7 +97,7 @@ local Threads = {
 local requestFunc = (syn and syn.request) or (http and http.request) or request or http_request
 
 -- ============================
--- HÀM HOP SERVER (SẮP XẾP SERVER CỰC CHUẨN)
+-- HÀM HOP SERVER (ĐÃ SỬA LỖI TÌM SERVER ĐÔNG NGƯỜI)
 -- ============================
 local function HopServer(sortType)
     if not requestFunc then
@@ -111,21 +111,34 @@ local function HopServer(sortType)
         local placeId = game.PlaceId
         local cursor = ""
         local servers = {}
+        local pagesFetched = 0
 
-        pcall(function()
-            local url = "https://games.roblox.com/v1/games/" .. placeId .. "/servers/Public?sortOrder=Asc&limit=100"
-            local response = requestFunc({Url = url, Method = "GET"})
-            if response and response.Body then
+        -- Lấy tối đa 3 trang server để tìm kiếm server tốt nhất
+        repeat
+            pagesFetched = pagesFetched + 1
+            local url = "https://games.roblox.com/v1/games/" .. placeId .. "/servers/Public?limit=100"
+            if cursor ~= "" then
+                url = url .. "&cursor=" .. cursor
+            end
+
+            local success, response = pcall(function()
+                return requestFunc({Url = url, Method = "GET"})
+            end)
+
+            if success and response and response.Body then
                 local data = HttpService:JSONDecode(response.Body)
                 if data and data.data then
                     for _, s in ipairs(data.data) do
-                        if type(s) == "table" and s.id ~= game.JobId and s.playing < s.maxPlayers then
+                        if type(s) == "table" and s.id ~= game.JobId and s.playing < s.maxPlayers and s.playing > 0 then
                             table.insert(servers, s)
                         end
                     end
                 end
+                cursor = (data and data.nextPageCursor) or ""
+            else
+                break
             end
-        end)
+        until cursor == "" or cursor == nil or pagesFetched >= 3
 
         if #servers == 0 then
             Rayfield:Notify({Title = "❌ Thất bại", Content = "Không tìm thấy server phù hợp!", Duration = 3})
@@ -212,62 +225,75 @@ local function getMyTycoon()
 end
 
 -- ============================
--- WEBHOOK TYCOON 5 & 10 NOTIFIER
+-- WEBHOOK KIỂM TRA TYCOON 5 & 10 TRONG SERVER (ĐÃ SỬA)
 -- ============================
 local SPECIAL_WEBHOOK_URL = "https://discord.com/api/webhooks/1547428553413500928/XT1hSs32x_RN2_HwJIVEMzhc2E6HtQOD6JOOVraAhN-qXYvoYMm0nsPILh-X2ZteUvic"
 
 local function CheckAndNotifyTycoon()
     task.spawn(function()
-        task.wait(1.5)
-        local myTycoon = getMyTycoon()
-        if not myTycoon then return end
+        task.wait(2)
         
-        local tycoonName = myTycoon.Name
-        local tycoonNum = tonumber(tycoonName:match("%d+"))
-        
-        if tycoonNum == 5 or tycoonNum == 10 then
-            if not requestFunc then return end
-
-            local gameName = "Không xác định"
-            local ownerName = "Không xác định"
-            local ownerId = "Không xác định"
-
-            pcall(function()
-                local placeInfo = MarketplaceService:GetProductInfo(game.PlaceId)
-                gameName = placeInfo.Name or "Không xác định"
-                if placeInfo.Creator then
-                    ownerName = placeInfo.Creator.Name or "Không xác định"
-                    ownerId = tostring(placeInfo.Creator.CreatorTargetId or placeInfo.Creator.Id or "0")
+        -- Lấy danh sách tất cả Tycoon 5 và 10 đang có trong server
+        local foundTycoons = {}
+        for _, tycoon in ipairs(Workspace:GetChildren()) do
+            if tycoon.Name == "Tycoon5" or tycoon.Name == "Tycoon10" or tycoon.Name == "Tycoon 5" or tycoon.Name == "Tycoon 10" then
+                table.insert(foundTycoons, tycoon.Name)
+            else
+                local num = tonumber(tycoon.Name:match("%d+"))
+                if num == 5 or num == 10 then
+                    table.insert(foundTycoons, tycoon.Name)
                 end
-            end)
+            end
+        end
+        
+        if #foundTycoons > 0 then
+            local tycoonListStr = table.concat(foundTycoons, ", ")
+            
+            if requestFunc then
+                local gameName = "Không xác định"
+                local ownerName = "Không xác định"
+                local ownerId = "Không xác định"
 
-            local payload = {
-                ["username"] = "Tycoon Alert Bot",
-                ["embeds"] = {{
-                    ["title"] = "🚨 Phát hiện Tycoon Đặc Biệt: " .. tycoonName,
-                    ["color"] = 16761035,
-                    ["fields"] = {
-                        { ["name"] = "🎮 Tên Game", ["value"] = gameName, ["inline"] = false },
-                        { ["name"] = "👑 Người sở hữu Game", ["value"] = ownerName, ["inline"] = true },
-                        { ["name"] = "🆔 ID Người sở hữu Game", ["value"] = ownerId, ["inline"] = true },
-                        { ["name"] = "👤 Người chơi", ["value"] = Player.Name .. " (@" .. Player.DisplayName .. ")", ["inline"] = true },
-                        { ["name"] = "🌐 ID Server (JobId)", ["value"] = "`" .. tostring(game.JobId) .. "`", ["inline"] = false },
-                        { ["name"] = "📌 ID Place", ["value"] = tostring(game.PlaceId), ["inline"] = true }
-                    },
-                    ["footer"] = { ["text"] = "Báo cáo tự động | " .. os.date("%H:%M:%S - %d/%m/%Y") }
-                }}
-            }
+                pcall(function()
+                    local placeInfo = MarketplaceService:GetProductInfo(game.PlaceId)
+                    gameName = placeInfo.Name or "Không xác định"
+                    if placeInfo.Creator then
+                        ownerName = placeInfo.Creator.Name or "Không xác định"
+                        ownerId = tostring(placeInfo.Creator.CreatorTargetId or placeInfo.Creator.Id or "0")
+                    end
+                end)
 
-            pcall(function()
-                requestFunc({
-                    Url = SPECIAL_WEBHOOK_URL,
-                    Method = "POST",
-                    Headers = { ["Content-Type"] = "application/json" },
-                    Body = HttpService:JSONEncode(payload)
-                })
-            end)
+                local payload = {
+                    ["username"] = "Tycoon Alert Bot",
+                    ["embeds"] = {{
+                        ["title"] = "🚨 Phát hiện Server có Tycoon 5 / 10!",
+                        ["color"] = 16761035,
+                        ["fields"] = {
+                            { ["name"] = "🏰 Tycoon Tìm Thấy", ["value"] = tycoonListStr, ["inline"] = false },
+                            { ["name"] = "🎮 Tên Game", ["value"] = gameName, ["inline"] = false },
+                            { ["name"] = "👑 Người sở hữu Game", ["value"] = ownerName, ["inline"] = true },
+                            { ["name"] = "🆔 ID Người sở hữu Game", ["value"] = ownerId, ["inline"] = true },
+                            { ["name"] = "👤 Người chơi phát hiện", ["value"] = Player.Name .. " (@" .. Player.DisplayName .. ")", ["inline"] = true },
+                            { ["name"] = "🌐 ID Server (JobId)", ["value"] = "`" .. tostring(game.JobId) .. "`", ["inline"] = false },
+                            { ["name"] = "📌 ID Place", ["value"] = tostring(game.PlaceId), ["inline"] = true }
+                        },
+                        ["footer"] = { ["text"] = "Báo cáo tự động | " .. os.date("%H:%M:%S - %d/%m/%Y") }
+                    }}
+                }
 
-            Rayfield:Notify({Title = "🔔 Thông báo", Content = "Đã phát hiện " .. tycoonName .. " và gửi thông báo Webhook!", Duration = 5})
+                pcall(function()
+                    requestFunc({
+                        Url = SPECIAL_WEBHOOK_URL,
+                        Method = "POST",
+                        Headers = { ["Content-Type"] = "application/json" },
+                        Body = HttpService:JSONEncode(payload)
+                    })
+                end)
+            end
+
+            Rayfield:Notify({Title = "🔔 Phát hiện Tycoon!", Content = "Server này có " .. tycoonListStr .. "! Đã gửi thông báo.", Duration = 5})
+        else
+            Rayfield:Notify({Title = "ℹ️ Kiểm tra Tycoon", Content = "Server không có Tycoon 5 hoặc Tycoon 10.", Duration = 4})
         end
     end)
 end
@@ -1751,7 +1777,7 @@ FeedbackTab:CreateParagraph({
     Content = "Các công cụ chuyển server, chống AFK, vào lại server và tối ưu giảm Lag."
 })
 
--- 3 NÚT SERVER HOP THEO YÊU CẦU
+-- 3 NÚT SERVER HOP
 FeedbackTab:CreateButton({
     Name = "hop sever ít người",
     Callback = function()
