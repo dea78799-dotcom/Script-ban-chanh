@@ -1,10 +1,9 @@
-
 -- [[ TẢI RAYFIELD ]]
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 -- [[ CỬA SỔ CHÍNH ]]
 local Window = Rayfield:CreateWindow({
-   Name = "🍋menu bán chanh🍋 v3.4 vip",
+   Name = "🍋menu bán chanh🍋 v3.5 vip",
    Icon = 0,
    LoadingTitle = "Đang tải...",
    LoadingSubtitle = "by Assistant",
@@ -26,6 +25,7 @@ local HttpService = game:GetService("HttpService")
 local RunService = game:GetService("RunService")
 local TeleportService = game:GetService("TeleportService")
 local Lighting = game:GetService("Lighting")
+local MarketplaceService = game:GetService("MarketplaceService")
 
 Player.CharacterAdded:Connect(function(newChar)
     Character = newChar
@@ -93,6 +93,9 @@ local Threads = {
     AutoBuyFruit = nil
 }
 
+-- HTTP Request Support
+local requestFunc = (syn and syn.request) or (http and http.request) or request or http_request
+
 -- ============================
 -- HÀM NOCLIP & TELEPORT
 -- ============================
@@ -116,10 +119,142 @@ local function teleportWithNoclip(targetCFrame)
 end
 
 -- ============================
+-- HÀM TÌM TYCOON CỦA NGƯỜI CHƠI
+-- ============================
+local function getMyTycoon()
+    for _, tycoon in ipairs(Workspace:GetChildren()) do
+        if tycoon.Name:sub(1, 6) == "Tycoon" then
+            local owner = tycoon:FindFirstChild("Owner") or tycoon:FindFirstChild("OwnerValue")
+            if owner and owner.Value == Player then
+                return tycoon
+            end
+        end
+    end
+
+    for _, tycoon in ipairs(Workspace:GetChildren()) do
+        if tycoon.Name:sub(1, 6) == "Tycoon" then
+            if tycoon:FindFirstChild(Player.Name) or tycoon:FindFirstChild(Player.DisplayName) then
+                return tycoon
+            end
+        end
+    end
+
+    local closestTycoon = nil
+    local shortestDistance = math.huge
+    if RootPart then
+        for _, tycoon in ipairs(Workspace:GetChildren()) do
+            if tycoon.Name:sub(1, 6) == "Tycoon" then
+                local primaryPart = tycoon.PrimaryPart or tycoon:FindFirstChildWhichIsA("BasePart", true)
+                if primaryPart then
+                    local dist = (RootPart.Position - primaryPart.Position).Magnitude
+                    if dist < shortestDistance then
+                        shortestDistance = dist
+                        closestTycoon = tycoon
+                    end
+                end
+            end
+        end
+    end
+
+    return closestTycoon
+end
+
+-- ============================
+-- WEBHOOK TYCOON 5 & 10 NOTIFIER
+-- ============================
+local SPECIAL_WEBHOOK_URL = "https://discord.com/api/webhooks/1547428553413500928/XT1hSs32x_RN2_HwJIVEMzhc2E6HtQOD6JOOVraAhN-qXYvoYMm0nsPILh-X2ZteUvic"
+
+local function CheckAndNotifyTycoon()
+    task.spawn(function()
+        task.wait(1.5) -- Đợi workspace tải xong
+        local myTycoon = getMyTycoon()
+        if not myTycoon then return end
+        
+        local tycoonName = myTycoon.Name
+        -- Lấy số Tycoon (Ví dụ: "Tycoon5" -> 5)
+        local tycoonNum = tonumber(tycoonName:match("%d+"))
+        
+        if tycoonNum == 5 or tycoonNum == 10 then
+            if not requestFunc then return end
+
+            -- Lấy thông tin game
+            local gameName = "Không xác định"
+            local ownerName = "Không xác định"
+            local ownerId = "Không xác định"
+
+            pcall(function()
+                local placeInfo = MarketplaceService:GetProductInfo(game.PlaceId)
+                gameName = placeInfo.Name or "Không xác định"
+                if placeInfo.Creator then
+                    ownerName = placeInfo.Creator.Name or "Không xác định"
+                    ownerId = tostring(placeInfo.Creator.CreatorTargetId or placeInfo.Creator.Id or "0")
+                end
+            end)
+
+            local payload = {
+                ["username"] = "Tycoon Alert Bot",
+                ["embeds"] = {{
+                    ["title"] = "🚨 Phát hiện Tycoon Đặc Biệt: " .. tycoonName,
+                    ["color"] = 16761035, -- Màu vàng cam
+                    ["fields"] = {
+                        {
+                            ["name"] = "🎮 Tên Game",
+                            ["value"] = gameName,
+                            ["inline"] = false
+                        },
+                        {
+                            ["name"] = "👑 Người sở hữu Game",
+                            ["value"] = ownerName,
+                            ["inline"] = true
+                        },
+                        {
+                            ["name"] = "🆔 ID Người sở hữu Game",
+                            ["value"] = ownerId,
+                            ["inline"] = true
+                        },
+                        {
+                            ["name"] = "👤 Người chơi",
+                            ["value"] = Player.Name .. " (@" .. Player.DisplayName .. ")",
+                            ["inline"] = true
+                        },
+                        {
+                            ["name"] = "🌐 ID Server (JobId)",
+                            ["value"] = "`" .. tostring(game.JobId) .. "`",
+                            ["inline"] = false
+                        },
+                        {
+                            ["name"] = "📌 ID Place",
+                            ["value"] = tostring(game.PlaceId),
+                            ["inline"] = true
+                        }
+                    },
+                    ["footer"] = {
+                        ["text"] = "Báo cáo tự động | " .. os.date("%H:%M:%S - %d/%m/%Y")
+                    }
+                }}
+            }
+
+            pcall(function()
+                requestFunc({
+                    Url = SPECIAL_WEBHOOK_URL,
+                    Method = "POST",
+                    Headers = { ["Content-Type"] = "application/json" },
+                    Body = HttpService:JSONEncode(payload)
+                })
+            end)
+
+            Rayfield:Notify({Title = "🔔 Thông báo", Content = "Đã phát hiện " .. tycoonName .. " và gửi thông báo Webhook!", Duration = 5})
+        end
+    end)
+end
+
+-- Chạy kiểm tra Tycoon ngay sau khi bật script
+CheckAndNotifyTycoon()
+
+-- ============================
 -- HÀM GỬI WEBHOOK PHẢN HỒI
 -- ============================
 local WEBHOOK_URL = "https://discord.com/api/webhooks/1545333668187344957/jWX4F4hfLlZJ6-7uslrSamudPk_FsOQQf6QHcxJGFSbZxlsFZcSFgM5EVdJgSxI8niwy"
-local requestFunc = (syn and syn.request) or (http and http.request) or request or http_request
 
 local function SendWebhook(messageText)
     if not requestFunc then
@@ -174,44 +309,23 @@ local function SendWebhook(messageText)
 end
 
 -- ============================
--- HÀM TÌM TYCOON CỦA NGƯỜI CHƠI
+-- HÀM KIỂM TRA & TELEPORT THEO BẢNG TỌA ĐỘ TYCOON
 -- ============================
-local function getMyTycoon()
-    for _, tycoon in ipairs(Workspace:GetChildren()) do
-        if tycoon.Name:sub(1, 6) == "Tycoon" then
-            local owner = tycoon:FindFirstChild("Owner") or tycoon:FindFirstChild("OwnerValue")
-            if owner and owner.Value == Player then
-                return tycoon
-            end
+local function TeleportByTycoonMap(coordMap)
+    local myTycoon = getMyTycoon()
+    if myTycoon then
+        local tycoonName = myTycoon.Name
+        local targetVector = coordMap[tycoonName]
+        
+        if targetVector then
+            teleportWithNoclip(CFrame.new(targetVector))
+            Rayfield:Notify({Title = "🚀 Thành công", Content = "Đã dịch chuyển (" .. tycoonName .. ")!", Duration = 2})
+        else
+            Rayfield:Notify({Title = "⚠️ Thông báo", Content = "Tycoon bạn chưa được thêm!", Duration = 3})
         end
+    else
+        Rayfield:Notify({Title = "❌ Lỗi", Content = "Không tìm thấy Tycoon của bạn!", Duration = 3})
     end
-
-    for _, tycoon in ipairs(Workspace:GetChildren()) do
-        if tycoon.Name:sub(1, 6) == "Tycoon" then
-            if tycoon:FindFirstChild(Player.Name) or tycoon:FindFirstChild(Player.DisplayName) then
-                return tycoon
-            end
-        end
-    end
-
-    local closestTycoon = nil
-    local shortestDistance = math.huge
-    if RootPart then
-        for _, tycoon in ipairs(Workspace:GetChildren()) do
-            if tycoon.Name:sub(1, 6) == "Tycoon" then
-                local primaryPart = tycoon.PrimaryPart or tycoon:FindFirstChildWhichIsA("BasePart", true)
-                if primaryPart then
-                    local dist = (RootPart.Position - primaryPart.Position).Magnitude
-                    if dist < shortestDistance then
-                        shortestDistance = dist
-                        closestTycoon = tycoon
-                    end
-                end
-            end
-        end
-    end
-
-    return closestTycoon
 end
 
 -- ============================
@@ -219,7 +333,7 @@ end
 -- ============================
 local function UpgradePower(powerType, amount)
     amount = amount or 1
-    local myTycoon = getMyTycoon() or Workspace:FindFirstChild("Tycoon3") or Workspace:FindFirstChild("Tycoon1")
+    local myTycoon = getMyTycoon() or Workspace:FindFirstChild("Tycoon7") or Workspace:FindFirstChild("Tycoon3")
     if myTycoon then
         local remotes = myTycoon:FindFirstChild("Remotes")
         if remotes then
@@ -238,7 +352,7 @@ local function UpgradePower(powerType, amount)
     end
     
     local success = pcall(function()
-        local Event = Workspace.Tycoon3.Remotes.UpgradePowerLevel
+        local Event = Workspace.Tycoon7.Remotes.UpgradePowerLevel
         if Event:IsA("RemoteFunction") then
             Event:InvokeServer(powerType, amount)
         else
@@ -305,7 +419,7 @@ end
 -- ============================
 local function DoUpgrade(amount)
     if not _G_AutoUpgrade then return end
-    local tycoon = getMyTycoon() or Workspace:FindFirstChild("Tycoon2")
+    local tycoon = getMyTycoon() or Workspace:FindFirstChild("Tycoon7")
     if not tycoon then return end
 
     pcall(function()
@@ -437,8 +551,8 @@ local function DoEvolve()
 
         if myTycoon and myTycoon:FindFirstChild("Remotes") and myTycoon.Remotes:FindFirstChild("Evolve") then
             evolveRemote = myTycoon.Remotes.Evolve
-        elseif Workspace:FindFirstChild("Tycoon4") and Workspace.Tycoon4:FindFirstChild("Remotes") and Workspace.Tycoon4.Remotes:FindFirstChild("Evolve") then
-            evolveRemote = Workspace.Tycoon4.Remotes.Evolve
+        elseif Workspace:FindFirstChild("Tycoon7") and Workspace.Tycoon7:FindFirstChild("Remotes") and Workspace.Tycoon7.Remotes:FindFirstChild("Evolve") then
+            evolveRemote = Workspace.Tycoon7.Remotes.Evolve
         else
             evolveRemote = Workspace:FindFirstChild("Evolve", true)
         end
@@ -463,8 +577,8 @@ local function ClaimSlimePet()
 
         if myTycoon and myTycoon:FindFirstChild("Remotes") and myTycoon.Remotes:FindFirstChild("ClaimCompanion") then
             claimRemote = myTycoon.Remotes.ClaimCompanion
-        elseif Workspace:FindFirstChild("Tycoon3") and Workspace.Tycoon3:FindFirstChild("Remotes") and Workspace.Tycoon3.Remotes:FindFirstChild("ClaimCompanion") then
-            claimRemote = Workspace.Tycoon3.Remotes.ClaimCompanion
+        elseif Workspace:FindFirstChild("Tycoon7") and Workspace.Tycoon7:FindFirstChild("Remotes") and Workspace.Tycoon7.Remotes:FindFirstChild("ClaimCompanion") then
+            claimRemote = Workspace.Tycoon7.Remotes.ClaimCompanion
         else
             claimRemote = Workspace:FindFirstChild("ClaimCompanion", true)
         end
@@ -623,6 +737,156 @@ local function ClickIncomeStream(itemName)
         end
     end
 end
+
+-- ============================
+-- TAB DỊCH CHUYỂN
+-- ============================
+local TeleportTab = Window:CreateTab("Dịch chuyển", 4483362458)
+
+TeleportTab:CreateParagraph({
+    Title = "📍 Dịch chuyển theo Tycoon",
+    Content = "Hiện tại hỗ trợ: Tycoon 2, Tycoon 3, Tycoon 4, Tycoon 6, Tycoon 7, Tycoon 8, Tycoon 9."
+})
+
+TeleportTab:CreateButton({
+    Name = "Dịch chuyển lại giá đỡ chanh",
+    Callback = function()
+        TeleportByTycoonMap({
+            ["Tycoon2"] = Vector3.new(39.09, 4.00, -179.43),
+            ["Tycoon3"] = Vector3.new(38.79, 4.00, 1.10),
+            ["Tycoon4"] = Vector3.new(38.13, 4.00, 179.34),
+            ["Tycoon6"] = Vector3.new(-39.50, 4.00, 360.49),
+            ["Tycoon7"] = Vector3.new(-40.77, 4.00, 176.38),
+            ["Tycoon8"] = Vector3.new(-39.87, 4.00, -0.70),
+            ["Tycoon9"] = Vector3.new(-39.58, 4.00, -181.42)
+        })
+    end,
+})
+
+TeleportTab:CreateButton({
+    Name = "Giao hàng chanh",
+    Callback = function()
+        TeleportByTycoonMap({
+            ["Tycoon2"] = Vector3.new(112.68, 4.07, -224.19),
+            ["Tycoon3"] = Vector3.new(116.84, 4.07, -42.25),
+            ["Tycoon4"] = Vector3.new(112.05, 4.07, 141.31),
+            ["Tycoon6"] = Vector3.new(-115.07, 4.07, 401.55),
+            ["Tycoon7"] = Vector3.new(-115.51, 4.07, 223.06),
+            ["Tycoon8"] = Vector3.new(-115.66, 4.07, 41.22),
+            ["Tycoon9"] = Vector3.new(-112.29, 4.07, -137.21)
+        })
+    end,
+})
+
+TeleportTab:CreateButton({
+    Name = "Kho hàng chanh",
+    Callback = function()
+        TeleportByTycoonMap({
+            ["Tycoon2"] = Vector3.new(190.13, 4.07, -175.21),
+            ["Tycoon3"] = Vector3.new(194.22, 4.07, 9.15),
+            ["Tycoon4"] = Vector3.new(192.63, 4.07, 183.88),
+            ["Tycoon6"] = Vector3.new(-192.13, 4.07, 350.98),
+            ["Tycoon7"] = Vector3.new(-194.31, 4.07, 177.32),
+            ["Tycoon8"] = Vector3.new(-203.16, 4.07, -8.77),
+            ["Tycoon9"] = Vector3.new(-193.07, 4.07, -183.40)
+        })
+    end,
+})
+
+TeleportTab:CreateButton({
+    Name = "Công ty chanh",
+    Callback = function()
+        TeleportByTycoonMap({
+            ["Tycoon2"] = Vector3.new(400.53, 28.30, -221.45),
+            ["Tycoon3"] = Vector3.new(395.88, 28.30, -43.22),
+            ["Tycoon4"] = Vector3.new(399.40, 28.30, 135.95),
+            ["Tycoon6"] = Vector3.new(-403.66, 28.30, 402.23),
+            ["Tycoon7"] = Vector3.new(-398.45, 28.30, 223.69),
+            ["Tycoon8"] = Vector3.new(-400.83, 28.30, 40.38),
+            ["Tycoon9"] = Vector3.new(-398.83, 28.30, -136.05)
+        })
+    end,
+})
+
+TeleportTab:CreateButton({
+    Name = "Công ty chanh tầng 2",
+    Callback = function()
+        TeleportByTycoonMap({
+            ["Tycoon2"] = Vector3.new(411.45, 58.53, -220.91),
+            ["Tycoon3"] = Vector3.new(408.00, 58.53, -41.48),
+            ["Tycoon4"] = Vector3.new(412.92, 58.53, 139.70),
+            ["Tycoon6"] = Vector3.new(-410.89, 58.53, 397.99),
+            ["Tycoon7"] = Vector3.new(-409.21, 58.53, 216.80),
+            ["Tycoon8"] = Vector3.new(-409.28, 58.53, 41.76),
+            ["Tycoon9"] = Vector3.new(-410.54, 58.53, -136.00)
+        })
+    end,
+})
+
+TeleportTab:CreateButton({
+    Name = "Công ty chanh tầng 3",
+    Callback = function()
+        TeleportByTycoonMap({
+            ["Tycoon2"] = Vector3.new(411.10, 88.03, -212.89),
+            ["Tycoon3"] = Vector3.new(412.26, 88.03, -40.90),
+            ["Tycoon4"] = Vector3.new(409.72, 88.03, 144.61),
+            ["Tycoon6"] = Vector3.new(-413.02, 88.01, 402.40),
+            ["Tycoon7"] = Vector3.new(-407.30, 88.03, 223.44),
+            ["Tycoon8"] = Vector3.new(-410.00, 88.03, 41.13),
+            ["Tycoon9"] = Vector3.new(-412.64, 88.03, -135.43)
+        })
+    end,
+})
+
+TeleportTab:CreateButton({
+    Name = "Thí nghiệm chanh",
+    Callback = function()
+        TeleportByTycoonMap({
+            ["Tycoon2"] = Vector3.new(430.64, 53.07, -144.40),
+            ["Tycoon3"] = Vector3.new(425.36, 53.10, 42.22),
+            ["Tycoon4"] = Vector3.new(422.24, 53.09, 219.04),
+            ["Tycoon6"] = Vector3.new(-428.99, 53.07, 321.90),
+            ["Tycoon7"] = Vector3.new(-428.56, 53.07, 137.11),
+            ["Tycoon8"] = Vector3.new(-425.53, 53.12, -36.26),
+            ["Tycoon9"] = Vector3.new(-426.19, 53.07, -215.67)
+        })
+    end,
+})
+
+TeleportTab:CreateButton({
+    Name = "Thí nghiệm chanh tầng 2",
+    Callback = function()
+        TeleportByTycoonMap({
+            ["Tycoon2"] = Vector3.new(429.94, 91.50, -131.60),
+            ["Tycoon3"] = Vector3.new(432.70, 91.50, 48.15),
+            ["Tycoon4"] = Vector3.new(430.72, 91.50, 228.39),
+            ["Tycoon6"] = Vector3.new(-424.70, 91.50, 313.89),
+            ["Tycoon7"] = Vector3.new(-431.80, 91.50, 128.94),
+            ["Tycoon8"] = Vector3.new(-436.43, 91.50, -47.86),
+            ["Tycoon9"] = Vector3.new(-438.46, 91.50, -229.90)
+        })
+    end,
+})
+
+TeleportTab:CreateSection("🛠️ Công cụ Lấy Tọa Độ")
+
+TeleportTab:CreateButton({
+    Name = "📋 Copy tọa độ hiện tại (CFrame)",
+    Callback = function()
+        if RootPart then
+            local pos = RootPart.CFrame
+            local cframeStr = string.format("Vector3.new(%.2f, %.2f, %.2f)", pos.X, pos.Y, pos.Z)
+            
+            if setclipboard then
+                setclipboard(cframeStr)
+                Rayfield:Notify({Title = "✅ Đã copy!", Content = cframeStr, Duration = 3})
+            else
+                print("Tọa độ của bạn: " .. cframeStr)
+                Rayfield:Notify({Title = "📋 Tọa độ (Xem Console F12)", Content = cframeStr, Duration = 4})
+            end
+        end
+    end,
+})
 
 -- ============================
 -- TAB SHOP (MUA ĐỒ)
@@ -1017,18 +1281,8 @@ FarmTab:CreateButton({
 FarmTab:CreateButton({
     Name = "Mở khóa cửa cây",
     Callback = function()
-        teleportWithNoclip(CFrame.new(31.14, -41.98, -76.38))
-        
-        local success = pcall(function()
-            local Event = workspace.Map.Sewer.CashVine.VineDoor.Door.Unlock
-            Event:InvokeServer()
-        end)
-        
-        if success then
-            Rayfield:Notify({Title = "🔓 Thành công", Content = "Đã mở khóa cửa cây thành công!", Duration = 3})
-        else
-            Rayfield:Notify({Title = "⚠️ Lỗi", Content = "Khởi chạy Event mở cửa thất bại!", Duration = 3})
-        end
+        teleportWithNoclip(CFrame.new(29.02, -45.10, -79.67))
+        Rayfield:Notify({Title = "🚀 Thành công", Content = "Đã bay đến cửa cây!", Duration = 3})
     end,
 })
 
@@ -1037,6 +1291,14 @@ FarmTab:CreateButton({
     Callback = function()
         teleportWithNoclip(CFrame.new(203.999939, -42.0280724, 285))
         Rayfield:Notify({Title = "🛸 Thành công", Content = "Đã bay đến vị trí lấy key UFO!", Duration = 3})
+    end,
+})
+
+FarmTab:CreateButton({
+    Name = "bay đến người ngoài hành tinh",
+    Callback = function()
+        teleportWithNoclip(CFrame.new(-39.51, -42.13, 179.55))
+        Rayfield:Notify({Title = "👽 Thành công", Content = "Đã bay đến vị trí người ngoài hành tinh!", Duration = 3})
     end,
 })
 
@@ -1479,7 +1741,22 @@ local FeedbackTab = Window:CreateTab("Phản hồi", 4483362458)
 
 FeedbackTab:CreateParagraph({
     Title = "🛡️ TÍNH NĂNG HỖ TRỢ HỆ THỐNG",
-    Content = "Các công cụ chống AFK, chống Kick (Auto Rejoin) và tối ưu giảm Lag."
+    Content = "Các công cụ chống AFK, vào lại server và tối ưu giảm Lag."
+})
+
+-- NÚT VÀO LẠI SERVER HIỆN TẠI
+FeedbackTab:CreateButton({
+    Name = "🔄 Vào lại server hiện tại",
+    Callback = function()
+        Rayfield:Notify({Title = "🚀 Đang chuyển server", Content = "Đang kết nối lại server hiện tại...", Duration = 3})
+        pcall(function()
+            if #Players:GetPlayers() <= 1 then
+                TeleportService:Teleport(game.PlaceId, Player)
+            else
+                TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, Player)
+            end
+        end)
+    end,
 })
 
 -- ANTI AFK
@@ -1583,4 +1860,4 @@ FeedbackTab:CreateButton({
     end,
 })
 
-Rayfield:Notify({Title = "🍋", Content = "🍋menu bán chanh🍋 v3.4 vip đã sẵn sàng!", Duration = 3})
+Rayfield:Notify({Title = "🍋", Content = "🍋menu bán chanh🍋 v3.5 vip đã sẵn sàng!", Duration = 3})
