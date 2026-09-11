@@ -1,5 +1,3 @@
-require('dotenv').config(); // Tải biến môi trường từ file .env
-
 const { 
   Client, 
   GatewayIntentBits, 
@@ -12,7 +10,20 @@ const {
   Events,
   Partials
 } = require('discord.js');
+const http = require('http');
 
+// 1. Tạo Server HTTP giả để Render kiểm tra trạng thái (Health Check)
+const server = http.createServer((req, res) => {
+  res.writeHead(200, { 'Content-Type': 'text/plain' });
+  res.end('Bot Discord đang hoạt động 24/7!');
+});
+
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => {
+  console.log(`🌐 Web server đang lắng nghe tại cổng ${PORT}`);
+});
+
+// 2. Khởi tạo Discord Bot
 const client = new Client({ 
   intents: [
     GatewayIntentBits.Guilds, 
@@ -30,7 +41,7 @@ client.once(Events.ClientReady, (c) => {
   console.log(`✅ Bot đã sẵn sàng! Đăng nhập với tên: ${c.user.tag}`);
 });
 
-// 1. Lệnh !senddm gửi nút bấm
+// 3. Lệnh !senddm gửi nút bấm cho Admin
 client.on(Events.MessageCreate, async (message) => {
   if (message.author.bot) return;
 
@@ -60,7 +71,7 @@ client.on(Events.MessageCreate, async (message) => {
   }
 });
 
-// 2. Xử lý Nút & Form Modal
+// 4. Xử lý khi bấm Nút & Submit Modal
 client.on(Events.InteractionCreate, async (interaction) => {
   
   if (interaction.isButton() && interaction.customId === 'btn_updates') {
@@ -99,5 +110,5 @@ client.on(Events.InteractionCreate, async (interaction) => {
   }
 });
 
-// Đăng nhập an toàn qua biến môi trường
+// 5. Đăng nhập bot
 client.login(process.env.DISCORD_TOKEN);
