@@ -1,3 +1,5 @@
+require('dotenv').config(); // Tải biến môi trường từ file .env
+
 const { 
   Client, 
   GatewayIntentBits, 
@@ -7,7 +9,8 @@ const {
   ModalBuilder, 
   TextInputBuilder, 
   TextInputStyle,
-  Events 
+  Events,
+  Partials
 } = require('discord.js');
 
 const client = new Client({ 
@@ -16,13 +19,18 @@ const client = new Client({
     GatewayIntentBits.GuildMessages, 
     GatewayIntentBits.MessageContent,
     GatewayIntentBits.DirectMessages
-  ] 
+  ],
+  partials: [Partials.Channel, Partials.Message]
 });
 
 // ID Kênh nhận thông báo
 const TARGET_CHANNEL_ID = '1547789797668425820';
 
-// 1. Lệnh !senddm để bot gửi tin nhắn riêng chứa nút bấm cho Admin
+client.once(Events.ClientReady, (c) => {
+  console.log(`✅ Bot đã sẵn sàng! Đăng nhập với tên: ${c.user.tag}`);
+});
+
+// 1. Lệnh !senddm gửi nút bấm
 client.on(Events.MessageCreate, async (message) => {
   if (message.author.bot) return;
 
@@ -40,18 +48,21 @@ client.on(Events.MessageCreate, async (message) => {
         components: [row]
       });
 
-      await message.reply('✅ Đã gửi tin nhắn riêng cho bạn!');
+      if (message.guild) {
+        await message.reply('✅ Đã gửi tin nhắn riêng cho bạn!');
+      }
     } catch (error) {
       console.error(error);
-      await message.reply('❌ Không thể gửi tin nhắn riêng. Hãy kiểm tra xem bạn đã mở quyền nhận DM từ thành viên máy chủ chưa!');
+      if (message.guild) {
+        await message.reply('❌ Không thể gửi DM. Vui lòng kiểm tra cài đặt nhận DM từ máy chủ!');
+      }
     }
   }
 });
 
-// 2. Xử lý khi bấm Nút & Gửi Modal trong tin nhắn riêng
+// 2. Xử lý Nút & Form Modal
 client.on(Events.InteractionCreate, async (interaction) => {
   
-  // Khi bấm nút "utdets lần này có gì"
   if (interaction.isButton() && interaction.customId === 'btn_updates') {
     const modal = new ModalBuilder()
       .setCustomId('modal_updates')
@@ -70,14 +81,11 @@ client.on(Events.InteractionCreate, async (interaction) => {
     await interaction.showModal(modal);
   }
 
-  // Khi bấm Gửi form Modal
   if (interaction.isModalSubmit() && interaction.customId === 'modal_updates') {
     const updateContent = interaction.fields.getTextInputValue('input_update_text');
 
-    // Phản hồi riêng cho Admin
-    await interaction.reply({ content: '✅ Đã gửi nội dung utdets lên kênh Discord thành công!' });
+    await interaction.reply({ content: '✅ Đã gửi nội dung utdets lên kênh thành công!', ephemeral: true });
 
-    // Gửi bài đăng vào kênh Discord chung
     try {
       const targetChannel = await client.channels.fetch(TARGET_CHANNEL_ID);
       if (targetChannel) {
@@ -91,6 +99,5 @@ client.on(Events.InteractionCreate, async (interaction) => {
   }
 });
 
-// Đăng nhập Bot sử dụng biến môi trường DISCORD_TOKEN
+// Đăng nhập an toàn qua biến môi trường
 client.login(process.env.DISCORD_TOKEN);
-    
