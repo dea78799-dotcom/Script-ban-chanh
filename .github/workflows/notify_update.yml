@@ -1,0 +1,56 @@
+name: Notify Discord on Script Update
+
+on:
+  push:
+    paths:
+      - 'README.md' # Tự động chạy mỗi khi bạn sửa file README.md (hoặc sửa thành '*.lua')
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+
+      - name: Install Dependencies
+        run: npm install discord.js
+
+      - name: Send Interactive Prompt to Discord
+        env:
+          DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
+          ADMIN_CHANNEL_ID: ${{ secrets.ADMIN_CHANNEL_ID }}
+          COMMIT_MSG: ${{ github.event.head_commit.message }}
+          COMMIT_AUTHOR: ${{ github.actor }}
+        run: |
+          node -e '
+          const { Client, GatewayIntentBits, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require("discord.js");
+          const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages] });
+
+          client.once("ready", async () => {
+              try {
+                  const channel = await client.channels.fetch(process.env.ADMIN_CHANNEL_ID);
+                  const row = new ActionRowBuilder().addComponents(
+                      new ButtonBuilder()
+                          .setCustomId("write_update_log")
+                          .setLabel("✍️ Ghi Update Log")
+                          .setStyle(ButtonStyle.Primary)
+                  );
+
+                  await channel.send({
+                      content: `🚀 **Phát hiện cập nhật Script trên GitHub!**\n👤 Người sửa: \`${process.env.COMMIT_AUTHOR}\`\n📌 Commit: \`${process.env.COMMIT_MSG}\`\n\nAdmin hãy ấn nút bên dưới để viết Update Log lần này:`,
+                      components: [row]
+                  });
+              } catch (err) {
+                  console.error(err);
+              } finally {
+                  client.destroy();
+              }
+          });
+
+          client.login(process.env.DISCORD_BOT_TOKEN);
+          '
