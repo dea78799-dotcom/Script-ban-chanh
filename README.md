@@ -1,4 +1,4 @@
--- [[ TẢI RAYFIELD ]]
+- [[ TẢI RAYFIELD ]]
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 -- [[ CỬA SỔ CHÍNH ]]
