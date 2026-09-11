@@ -97,7 +97,7 @@ local Threads = {
 local requestFunc = (syn and syn.request) or (http and http.request) or request or http_request
 
 -- ============================
--- HÀM HOP SERVER (ĐÃ SỬA LỖI TÌM SERVER ĐÔNG NGƯỜI)
+-- HÀM HOP SERVER
 -- ============================
 local function HopServer(sortType)
     if not requestFunc then
@@ -113,7 +113,6 @@ local function HopServer(sortType)
         local servers = {}
         local pagesFetched = 0
 
-        -- Lấy tối đa 3 trang server để tìm kiếm server tốt nhất
         repeat
             pagesFetched = pagesFetched + 1
             local url = "https://games.roblox.com/v1/games/" .. placeId .. "/servers/Public?limit=100"
@@ -146,15 +145,12 @@ local function HopServer(sortType)
         end
 
         if sortType == "Low" then
-            -- Xếp từ ít người nhất đến đông người nhất
             table.sort(servers, function(a, b) return a.playing < b.playing end)
             TeleportService:TeleportToPlaceInstance(placeId, servers[1].id, Player)
         elseif sortType == "High" then
-            -- Xếp từ đông người nhất đến ít người nhất
             table.sort(servers, function(a, b) return a.playing > b.playing end)
             TeleportService:TeleportToPlaceInstance(placeId, servers[1].id, Player)
         elseif sortType == "Random" then
-            -- Chọn 1 server ngẫu nhiên
             local randomServer = servers[math.random(1, #servers)]
             TeleportService:TeleportToPlaceInstance(placeId, randomServer.id, Player)
         end
@@ -225,23 +221,27 @@ local function getMyTycoon()
 end
 
 -- ============================
--- WEBHOOK KIỂM TRA TYCOON 5 & 10 TRONG SERVER (ĐÃ SỬA)
+-- WEBHOOK KIỂM TRA TYCOON 5 & 10 (ĐÃ SỬA CHUẨN XÁC)
 -- ============================
 local SPECIAL_WEBHOOK_URL = "https://discord.com/api/webhooks/1547428553413500928/XT1hSs32x_RN2_HwJIVEMzhc2E6HtQOD6JOOVraAhN-qXYvoYMm0nsPILh-X2ZteUvic"
 
 local function CheckAndNotifyTycoon()
     task.spawn(function()
-        task.wait(2)
+        task.wait(3)
         
-        -- Lấy danh sách tất cả Tycoon 5 và 10 đang có trong server
         local foundTycoons = {}
-        for _, tycoon in ipairs(Workspace:GetChildren()) do
-            if tycoon.Name == "Tycoon5" or tycoon.Name == "Tycoon10" or tycoon.Name == "Tycoon 5" or tycoon.Name == "Tycoon 10" then
-                table.insert(foundTycoons, tycoon.Name)
-            else
-                local num = tonumber(tycoon.Name:match("%d+"))
-                if num == 5 or num == 10 then
-                    table.insert(foundTycoons, tycoon.Name)
+        
+        -- Quét chính xác các Tycoon trong Workspace
+        for _, object in ipairs(Workspace:GetChildren()) do
+            -- Chỉ kiểm tra các đối tượng bắt đầu bằng chữ "Tycoon"
+            if object.Name:sub(1, 6) == "Tycoon" then
+                -- Lấy phần số sau chữ Tycoon
+                local tycoonNum = object.Name:match("^Tycoon%s*(%d+)$")
+                if tycoonNum then
+                    local num = tonumber(tycoonNum)
+                    if num == 5 or num == 10 then
+                        table.insert(foundTycoons, object.Name)
+                    end
                 end
             end
         end
@@ -1777,7 +1777,6 @@ FeedbackTab:CreateParagraph({
     Content = "Các công cụ chuyển server, chống AFK, vào lại server và tối ưu giảm Lag."
 })
 
--- 3 NÚT SERVER HOP
 FeedbackTab:CreateButton({
     Name = "hop sever ít người",
     Callback = function()
@@ -1799,7 +1798,6 @@ FeedbackTab:CreateButton({
     end,
 })
 
--- NÚT VÀO LẠI SERVER HIỆN TẠI
 FeedbackTab:CreateButton({
     Name = "🔄 Vào lại server hiện tại",
     Callback = function()
@@ -1814,7 +1812,6 @@ FeedbackTab:CreateButton({
     end,
 })
 
--- ANTI AFK
 FeedbackTab:CreateToggle({
     Name = "Anti AFK (Tránh bị kick 20p)",
     CurrentValue = false,
@@ -1844,7 +1841,6 @@ FeedbackTab:CreateToggle({
     end
 })
 
--- ANTI KICK / AUTO REJOIN
 FeedbackTab:CreateButton({
     Name = "Bật Anti Kick (Auto Rejoin)",
     Callback = function()
@@ -1862,7 +1858,6 @@ FeedbackTab:CreateButton({
     end,
 })
 
--- ANTI LAG / REDUCE LAG
 FeedbackTab:CreateButton({
     Name = "Anti Lag (Tối ưu hóa game)",
     Callback = function()
