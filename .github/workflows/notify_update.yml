@@ -2,8 +2,8 @@ name: Notify Discord on Script Update
 
 on:
   push:
-    paths:
-      - 'README.md' # Tự động chạy mỗi khi bạn sửa file README.md (hoặc sửa thành '*.lua')
+    branches:
+      - main
 
 jobs:
   notify:
@@ -20,33 +20,34 @@ jobs:
       - name: Install Dependencies
         run: npm install discord.js
 
-      - name: Send Interactive Prompt to Discord
+      - name: Send Private Message to Admin
         env:
           DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
-          ADMIN_CHANNEL_ID: ${{ secrets.ADMIN_CHANNEL_ID }}
           COMMIT_MSG: ${{ github.event.head_commit.message }}
           COMMIT_AUTHOR: ${{ github.actor }}
+          MY_USER_ID: '1449667262796660786'
         run: |
           node -e '
           const { Client, GatewayIntentBits, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require("discord.js");
-          const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages] });
+          const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.DirectMessages] });
 
           client.once("ready", async () => {
               try {
-                  const channel = await client.channels.fetch(process.env.ADMIN_CHANNEL_ID);
+                  const user = await client.users.fetch(process.env.MY_USER_ID);
                   const row = new ActionRowBuilder().addComponents(
                       new ButtonBuilder()
                           .setCustomId("write_update_log")
-                          .setLabel("✍️ Ghi Update Log")
-                          .setStyle(ButtonStyle.Primary)
+                          .setLabel("✍️ Nhập Update Log để Đăng")
+                          .setStyle(ButtonStyle.Success)
                   );
 
-                  await channel.send({
-                      content: `🚀 **Phát hiện cập nhật Script trên GitHub!**\n👤 Người sửa: \`${process.env.COMMIT_AUTHOR}\`\n📌 Commit: \`${process.env.COMMIT_MSG}\`\n\nAdmin hãy ấn nút bên dưới để viết Update Log lần này:`,
+                  await user.send({
+                      content: `🔔 **Sếp ơi! Vừa có cập nhật mới trên GitHub!**\n👤 Người sửa: \`${process.env.COMMIT_AUTHOR}\`\n📌 Commit: \`${process.env.COMMIT_MSG}\`\n\nBấm nút bên dưới để viết Update Log gửi lên kênh công khai nhé:`,
                       components: [row]
                   });
               } catch (err) {
-                  console.error(err);
+                  console.error("Lỗi gửi tin riêng:", err);
+                  process.exit(1);
               } finally {
                   client.destroy();
               }
