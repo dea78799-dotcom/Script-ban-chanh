@@ -1,9 +1,9 @@
-- [[ TẢI RAYFIELD ]]
+-- [[ TẢI RAYFIELD ]]
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 -- [[ CỬA SỔ CHÍNH ]]
 local Window = Rayfield:CreateWindow({
-   Name = "🍋menu bán chanh🍋 v3.5 vip",
+   Name = "🍋menu bán chanh🍋 v3.5 vip (Fixed for Delta)",
    Icon = 0,
    LoadingTitle = "Đang tải...",
    LoadingSubtitle = "by Assistant",
@@ -19,13 +19,13 @@ local Character = Player.Character or Player.CharacterAdded:Wait()
 local RootPart = Character:WaitForChild("HumanoidRootPart")
 local Workspace = game:GetService("Workspace")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local VirtualInputManager = game:GetService("VirtualInputManager")
 local GuiService = game:GetService("GuiService")
 local HttpService = game:GetService("HttpService")
 local RunService = game:GetService("RunService")
 local TeleportService = game:GetService("TeleportService")
 local Lighting = game:GetService("Lighting")
 local MarketplaceService = game:GetService("MarketplaceService")
+local VirtualUser = game:GetService("VirtualUser")
 
 Player.CharacterAdded:Connect(function(newChar)
     Character = newChar
@@ -93,8 +93,11 @@ local Threads = {
     AutoBuyFruit = nil
 }
 
--- HTTP Request Support
-local requestFunc = (syn and syn.request) or (http and http.request) or request or http_request
+-- HTTP Request Support (Chuẩn hóa cho Delta & Mobile Executors)
+local requestFunc = (typeof(request) == "function" and request) 
+    or (typeof(http_request) == "function" and http_request) 
+    or (syn and syn.request) 
+    or (http and http.request)
 
 -- ============================
 -- HÀM HOP SERVER
@@ -125,15 +128,17 @@ local function HopServer(sortType)
             end)
 
             if success and response and response.Body then
-                local data = HttpService:JSONDecode(response.Body)
-                if data and data.data then
+                local decodeSuccess, data = pcall(function() return HttpService:JSONDecode(response.Body) end)
+                if decodeSuccess and data and data.data then
                     for _, s in ipairs(data.data) do
                         if type(s) == "table" and s.id ~= game.JobId and s.playing < s.maxPlayers and s.playing > 0 then
                             table.insert(servers, s)
                         end
                     end
+                    cursor = data.nextPageCursor or ""
+                else
+                    break
                 end
-                cursor = (data and data.nextPageCursor) or ""
             else
                 break
             end
@@ -164,9 +169,11 @@ local function teleportWithNoclip(targetCFrame)
     if not Character or not RootPart then return end
     
     local noclipConnection = RunService.Stepped:Connect(function()
-        for _, part in ipairs(Character:GetDescendants()) do
-            if part:IsA("BasePart") then
-                part.CanCollide = false
+        if Character then
+            for _, part in ipairs(Character:GetDescendants()) do
+                if part:IsA("BasePart") then
+                    part.CanCollide = false
+                end
             end
         end
     end)
@@ -221,7 +228,7 @@ local function getMyTycoon()
 end
 
 -- ============================
--- WEBHOOK KIỂM TRA TYCOON 5 & 10 (ĐÃ SỬA CHUẨN XÁC)
+-- WEBHOOK KIỂM TRA TYCOON 5 & 10
 -- ============================
 local SPECIAL_WEBHOOK_URL = "https://discord.com/api/webhooks/1547428553413500928/XT1hSs32x_RN2_HwJIVEMzhc2E6HtQOD6JOOVraAhN-qXYvoYMm0nsPILh-X2ZteUvic"
 
@@ -230,12 +237,8 @@ local function CheckAndNotifyTycoon()
         task.wait(3)
         
         local foundTycoons = {}
-        
-        -- Quét chính xác các Tycoon trong Workspace
         for _, object in ipairs(Workspace:GetChildren()) do
-            -- Chỉ kiểm tra các đối tượng bắt đầu bằng chữ "Tycoon"
             if object.Name:sub(1, 6) == "Tycoon" then
-                -- Lấy phần số sau chữ Tycoon
                 local tycoonNum = object.Name:match("^Tycoon%s*(%d+)$")
                 if tycoonNum then
                     local num = tonumber(tycoonNum)
@@ -1826,14 +1829,20 @@ FeedbackTab:CreateToggle({
         if _G_AntiAFK then
             Rayfield:Notify({Title = "🛡️ Anti AFK", Content = "Đã BẬT chống treo máy 20 phút!", Duration = 3})
             Threads.AntiAFK = task.spawn(function()
+                local idledConn
+                idledConn = Player.Idled:Connect(function()
+                    if _G_AntiAFK then
+                        VirtualUser:Button2Down(Vector2.new(0,0), Workspace.CurrentCamera.CFrame)
+                        task.wait(1)
+                        VirtualUser:Button2Up(Vector2.new(0,0), Workspace.CurrentCamera.CFrame)
+                    else
+                        if idledConn then idledConn:Disconnect() end
+                    end
+                end)
                 while _G_AntiAFK do
-                    pcall(function()
-                        VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.Unknown, false, game)
-                        task.wait(0.1)
-                        VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.Unknown, false, game)
-                    end)
-                    task.wait(60)
+                    task.wait(1)
                 end
+                if idledConn then idledConn:Disconnect() end
             end)
         else
             Rayfield:Notify({Title = "⏹️ Anti AFK", Content = "Đã TẮT Anti AFK!", Duration = 2})
